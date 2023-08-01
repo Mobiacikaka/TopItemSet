@@ -5,58 +5,39 @@
 #include <string>
 #include <bloom.h>
 
-typedef struct KV_type
+class Itemset
 {
-	std::string ID;
-	int count;
+private:
+	std::vector<std::string> data;
 
-	KV_type() {}
+protected:
 
-	KV_type(std::string ID, int count)
-	{
-		this->ID = ID;
-		this->count = count;
-	}
+public:
+	Itemset(std::string uncut_str, std::string seperator);
+	Itemset(std::vector<std::string> cut_str);
 
-	KV_type(const struct KV_type & t)
-	{
-		this->ID = t.ID;
-		this->count = t.count;
-	}
-
-	~KV_type() {}
-
-	bool operator<(struct KV_type& kv2)
-	{
-		return this->count < kv2.count;
-	}
-
-} KV_type;
+	void PrintItemset() const;
+	
+	~Itemset();
+};
 
 class Dataset
 {
 private:
-	std::vector<KV_type> content;
-
-protected:
-	size_t nr_users;
-
-friend class Party;
+	std::vector<Itemset> data;
 
 public:
-	Dataset() {}
+	Dataset();
 	~Dataset() {}
 
-	void ReadDataset();
-	void SortDataset();
-	void Prune(size_t s);
+	Itemset & operator[](size_t i);
 
-	struct bloom * BloomPack(size_t k);
-	size_t BloomCheck(struct bloom * blm, size_t k);
-	size_t size() { return content.size(); }
-	KV_type & operator[](size_t i) { return content[i]; }
-	void erase(size_t i) { content.erase(content.begin()+i); }
-	void print(std::string filename);
+	size_t GetDatasetSize() const;
+	void PrintDataset() const;
+	void PruneDataset(size_t );
+
+	/* struct bloom * BloomPack(size_t k); */
+	/* size_t BloomCheck(struct bloom * blm, size_t k); */
 };
 
 #endif
