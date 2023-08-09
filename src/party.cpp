@@ -1,5 +1,3 @@
-#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
-
 #include "party.hpp"
 #include "MurmurHash3.h"
 
@@ -13,11 +11,6 @@
 #include <ENCRYPTO_utils/connection.h>
 #include <abycore/circuit/booleancircuits.h>
 #include <abycore/sharing/sharing.h>
-#include <cryptopp/md5.h>
-#include <cryptopp/files.h>
-#include <cryptopp/filters.h>
-#include <cryptopp/hex.h>
-#include <cryptopp/integer.h>
 
 using namespace std;
 
@@ -35,12 +28,12 @@ const size_t prune_times = 3;
 #endif
 
 void Party::set_param(
-	e_role role, 
-	std::string address, 
-	uint16_t port, 
-	seclvl seclevel, 
-	uint32_t bitlen, 
-	uint32_t nthreads, 
+	e_role role,
+	std::string address,
+	uint16_t port,
+	seclvl seclevel,
+	uint32_t bitlen,
+	uint32_t nthreads,
 	e_mt_gen_alg mt_alg,
 	size_t k,
 	size_t kbar,
@@ -66,11 +59,11 @@ void Party::set_param(
 	this->mu = mu;
 }
 
-void Party::print_dataset(std::string filename)
+void Party::PrintSharedDataset(std::string filename)
 {
 	if(filename.empty()) {
 		for(size_t i = 0; i < shr_dataset.size(); i ++)
-			cout << shr_dataset[i].ID << "\t" << shr_dataset[i].count << endl;
+			cout << shr_dataset[i].first << "\t" << shr_dataset[i].second << endl;
 		return;
 	}
 
@@ -81,7 +74,7 @@ void Party::print_dataset(std::string filename)
 	}
 
 	for(size_t i = 0; i < shr_dataset.size(); i ++)
-		file << shr_dataset[i].ID << "\t" << shr_dataset[i].count << endl;
+		file << shr_dataset[i].first << "\t" << shr_dataset[i].second << endl;
 }
 
 double Party::get_delta(size_t nr_users)
@@ -125,10 +118,13 @@ void Party::Run()
 	clock_t global_start = clock();
 #endif
 
-	dataset.ReadDataset();
-	dataset.SortDataset();
-	delta = this->get_delta(dataset.nr_users);
-	dataset.print("Ready.out");
+	// key is combination of different item, value is count
+	assert(dataset_of_itemset.GetDatasetSize() != 0);
+	this->dataset_of_combination.ReadOriginalDataset(dataset_of_itemset);
+	dataset_of_combination.SortDataset();
+
+	// FIXME what dataset's size should be use
+	delta = this->get_delta(dataset_of_combination.GetDatasetSize());
 
 	clog << "Ready for calculate" << endl;
 
@@ -139,7 +135,7 @@ void Party::Run()
 #ifdef COUNT_TIME
 	clock_t prune_end = clock();
 #endif
-	dataset.print("Prune.out");
+	/* dataset.print("Prune.out"); */
 	clog << "Prune Finished" << endl;
 
 #ifdef COUNT_TIME
@@ -149,7 +145,7 @@ void Party::Run()
 #ifdef COUNT_TIME
 	clock_t merge_end = clock();
 #endif
-	this->print_dataset("Merge.out");
+	/* this->PrintSharedDataset("Merge.out"); */
 	clog << "Merge Finished" << endl;
 
 #ifdef COUNT_TIME
@@ -159,7 +155,7 @@ void Party::Run()
 #ifdef COUNT_TIME
 	clock_t sort_end = clock();
 #endif
-	this->print_dataset("Sort.out");
+	/* this->PrintSharedDataset("Sort.out"); */
 	clog << "Sort Finished" << endl;
 
 #ifdef COUNT_TIME
@@ -249,7 +245,7 @@ int64_t Party::jacobi(uint64_t a, uint64_t n) {
 	if(e % 2 == 0) s = 1;
 	else if(n % 8 == 1 || n % 8 == 7) s = 1;
 	else if(n % 8 == 3 || n % 8 == 5) s = -1;
-	
+
 	if(n % 4 == 3 && a1 % 4 == 3) s *= -1;
 
 	uint64_t n1 = n % a1;
@@ -268,16 +264,18 @@ uint64_t Party::decrypt_bit(uint64_t bitc, struct Key &key) {
 
 
 uint64_t Party::get_sizeof_interset_server(std::unique_ptr<CSocket> &tsocket, struct Key &key_A, size_t prune_size) {
-	prune_size = prune_size > dataset.size() ? dataset.size() : prune_size;
+	prune_size =
+		prune_size > dataset_of_combination.GetDatasetSize() ?
+		dataset_of_combination.GetDatasetSize() : prune_size;
 
 	// step 1
 	vector<uint32_t> blm = vector<uint32_t>(this->M, 1);
-	for(int i = 0; i < prune_size && i < dataset.size(); i ++) {
-		KV_type item(dataset[i]);
+	for(int i = 0; i < prune_size && i < dataset_of_combination.GetDatasetSize(); i ++) {
+		KVpair item(dataset_of_combination[i]);
 		for(int j = 0; j < H.size(); j ++)
 		{
 			uint32_t hv;
-			MurmurHash3_x86_32(item.ID.c_str(), item.ID.size(), H[j], &hv);
+			MurmurHash3_x86_32(item.first.c_str(), item.first.size(), H[j], &hv);
 			hv %= M;
 			blm[hv] = 0;
 		}
@@ -290,10 +288,10 @@ uint64_t Party::get_sizeof_interset_server(std::unique_ptr<CSocket> &tsocket, st
 
 	// step 2
 	vector<vector<uint64_t>> EB_list;
-	for(int i = 0; i < prune_size && i < dataset.size(); i ++)
+	for(int i = 0; i < prune_size && i < dataset_of_combination.GetDatasetSize(); i ++)
 	{
 		vector<uint64_t> EB;
-		for(int j = 0; j < H.size(); j ++) 
+		for(int j = 0; j < H.size(); j ++)
 		{
 			uint64_t value;
 			tsocket->Receive((void *)&value, sizeof(value));
@@ -320,7 +318,9 @@ uint64_t Party::get_sizeof_interset_server(std::unique_ptr<CSocket> &tsocket, st
 
 
 uint64_t Party::get_sizeof_interset_client(std::unique_ptr<CSocket> &tsocket, struct Key &key_A, size_t prune_size) {
-	prune_size = prune_size > dataset.size() ? dataset.size() : prune_size;
+	prune_size =
+		prune_size > dataset_of_combination.GetDatasetSize() ?
+		dataset_of_combination.GetDatasetSize() : prune_size;
 
 	// step 1
 	vector<uint64_t> cblm;
@@ -332,13 +332,13 @@ uint64_t Party::get_sizeof_interset_client(std::unique_ptr<CSocket> &tsocket, st
 	}
 
 	// step 2
-	for(int i = 0; i < prune_size && i < dataset.size(); i ++) 
+	for(int i = 0; i < prune_size && i < dataset_of_combination.GetDatasetSize(); i ++)
 	{
-		KV_type item(dataset[i]);
+		KVpair item(dataset_of_combination[i]);
 		for(int j = 0; j < H.size(); j ++)
 		{
 			uint32_t hv(0);
-			MurmurHash3_x86_32(item.ID.c_str(), item.ID.size(), H[j], &hv);
+			MurmurHash3_x86_32(item.first.c_str(), item.first.size(), H[j], &hv);
 			hv %= M;
 			uint64_t bh = cblm[hv];
 			uint64_t qrm = this->encrypt_bit(0, key_A);
@@ -409,35 +409,21 @@ void Party::Prune()
 		prune_size = kbar * pow(2, i-1) + 1;
 	else
 		prune_size = kbar * pow(2, i) + 1;
-	if(prune_size > dataset.size())
-		prune_size = dataset.size();
-}
-
-void Party::makeMD5set()
-{
-	using namespace CryptoPP;
-	for(size_t i = 0; i < dataset.size(); i ++) {
-		string ID = dataset[i].ID;
-		string digest;
-		Weak1::MD5 hash;
-
-		hash.Update((const CryptoPP::byte*)&ID[0], ID.size());
-		digest.resize(hash.DigestSize());
-		hash.Final((CryptoPP::byte*)&digest[0]);
-
-		md5set.push_back(digest);
-	}
+	if(prune_size > dataset_of_combination.GetDatasetSize())
+		prune_size = dataset_of_combination.GetDatasetSize();
 }
 
 int Party::MakeShareSrv(size_t & index, CSocket * tsocket)
 {
 	int shr_rnd;
-	string str = md5set[index];
+	string str = this->dataset_of_combination[index].first;
 
 	tsocket->Send((void *)str.c_str(), str.size());
 	tsocket->Receive((void *)&shr_rnd, sizeof(shr_rnd));
 
-	return role == SERVER ? shr_rnd + dataset[index].count : shr_rnd - dataset[index].count;
+	return role == SERVER ?
+		shr_rnd + dataset_of_combination[index].second:
+		shr_rnd - dataset_of_combination[index].second;
 }
 
 int Party::MakeShareCli(CSocket * tsocket)
@@ -448,18 +434,20 @@ int Party::MakeShareCli(CSocket * tsocket)
 	tsocket->Receive((void *)&encoded[0], encoded.size());
 
 	// Part 2: check the local dataset and find the same one
-	auto i = find(md5set.begin(), md5set.end(), encoded);
-	size_t index = i - md5set.begin();
+	size_t index(0);
+	for (index = 0; index < this->dataset_of_combination.GetDatasetSize(); index ++)
+		if (this->dataset_of_combination[index].first == encoded) break;
 
 	int shr_rnd = rand() & MASK;
 	tsocket->Send((void *)&shr_rnd, sizeof(shr_rnd));
-	int rtn = role == SERVER ? shr_rnd + dataset[index].count : shr_rnd - dataset[index].count;
+	int rtn = role == SERVER ?
+		shr_rnd + dataset_of_combination[index].second:
+		shr_rnd - dataset_of_combination[index].second;
 
-	if(index < dataset.size())
+	if(index < dataset_of_combination.GetDatasetSize())
 	{
-		if(index < prune_size) prune_size --; 
-		dataset.erase(index);
-		md5set.erase(md5set.begin() + index);
+		if(index < prune_size) prune_size --;
+		dataset_of_combination.EraseFromIndexToEnd(index);
 	}
 
 	return rtn;
@@ -468,7 +456,7 @@ int Party::MakeShareCli(CSocket * tsocket)
 void Party::Merge()
 {
 	unique_ptr<CSocket> tsocket;
-	makeMD5set();
+	/* makeMD5set(); */
 
 	if(role == SERVER)
 	{
@@ -480,18 +468,19 @@ void Party::Merge()
 
 		for(size_t i = 0; i < prune_size; i ++)
 		{
-			KV_type tmp_kv(dataset[i].ID, MakeShareSrv(i, tsocket.get()));
+			KVpair tmp_kv(dataset_of_combination[i].first, MakeShareSrv(i, tsocket.get()));
 			shr_dataset.push_back(tmp_kv);
 		}
 
 		size_t left;
 		tsocket->Receive((void *)&left, sizeof(left));
 		for(size_t i = 0; i < left; i ++) {
-			KV_type tmp_kv("", MakeShareCli(tsocket.get()));
+			KVpair tmp_kv("", MakeShareCli(tsocket.get()));
 			shr_dataset.push_back(tmp_kv);
 		}
 	}
-	else {
+	else
+	{
 		tsocket = Connect(address, port);
 		if(!tsocket) {
 			cerr << "Connect Failed!" << endl;
@@ -501,14 +490,14 @@ void Party::Merge()
 		size_t len = prune_size;
 		for(size_t i = 0; i < len; i ++)
 		{
-			KV_type tmp_kv("", MakeShareCli(tsocket.get()));
+			KVpair tmp_kv("", MakeShareCli(tsocket.get()));
 			shr_dataset.push_back(tmp_kv);
 		}
 
 		tsocket->Send((void *)&prune_size, sizeof(prune_size));
 		for(size_t i = 0; i < prune_size; i++)
 		{
-			KV_type tmp_kv(dataset[i].ID, MakeShareSrv(i, tsocket.get()));
+			KVpair tmp_kv(dataset_of_combination[i].first, MakeShareSrv(i, tsocket.get()));
 			shr_dataset.push_back(tmp_kv);
 		}
 	}
@@ -517,7 +506,7 @@ void Party::Merge()
 }
 
 // non-Secure compare
-bool Party::compare(KV_type & kv1, KV_type & kv2)
+bool Party::compare(KVpair & kv1, KVpair & kv2)
 {
 	unique_ptr<CSocket> tsocket;
 	bool flag(false);
@@ -532,7 +521,7 @@ bool Party::compare(KV_type & kv1, KV_type & kv2)
 		tsocket->Receive((void *)&count1, sizeof(count1));
 		tsocket->Receive((void *)&count2, sizeof(count2));
 
-		flag = kv1.count - count1 > kv2.count - count2;
+		flag = kv1.second - count1 > kv2.second - count2;
 		tsocket->Send((void *)&flag, sizeof(flag));
 	}
 	else {
@@ -544,8 +533,8 @@ bool Party::compare(KV_type & kv1, KV_type & kv2)
 
 		int rnd = rand() & MASK;
 		int count1, count2;
-		count1 = kv1.count - rnd;
-		count2 = kv2.count - rnd;
+		count1 = kv1.second - rnd;
+		count2 = kv2.second - rnd;
 		tsocket->Send((void *)&count1, sizeof(count1));
 		tsocket->Send((void *)&count2, sizeof(count2));
 
@@ -557,7 +546,7 @@ bool Party::compare(KV_type & kv1, KV_type & kv2)
 }
 
 // Secure compare
-bool Party::compare(KV_type & kv1, KV_type & kv2, int)
+bool Party::compare(KVpair & kv1, KVpair & kv2, int)
 {
 	ABYParty * party = new ABYParty(role, address, port, seclevel, bitlen, nthreads, mt_alg);
 	vector<Sharing*> sharings = party->GetSharings();
@@ -565,16 +554,16 @@ bool Party::compare(KV_type & kv1, KV_type & kv2, int)
 
 	share *srv1, *srv2, *cli1, *cli2;
 	if(role == SERVER) {
-		srv1 = circ->PutINGate(static_cast<uint32_t>(kv1.count), bitlen, role);
-		srv2 = circ->PutINGate(static_cast<uint32_t>(kv2.count), bitlen, role);
+		srv1 = circ->PutINGate(static_cast<uint32_t>(kv1.second), bitlen, role);
+		srv2 = circ->PutINGate(static_cast<uint32_t>(kv2.second), bitlen, role);
 		cli1 = circ->PutDummyINGate(bitlen);
 		cli2 = circ->PutDummyINGate(bitlen);
 	}
 	else {
 		srv1 = circ->PutDummyINGate(bitlen);
 		srv2 = circ->PutDummyINGate(bitlen);
-		cli1 = circ->PutINGate(static_cast<uint32_t>(kv1.count), bitlen, role);
-		cli2 = circ->PutINGate(static_cast<uint32_t>(kv2.count), bitlen, role);
+		cli1 = circ->PutINGate(static_cast<uint32_t>(kv1.second), bitlen, role);
+		cli2 = circ->PutINGate(static_cast<uint32_t>(kv2.second), bitlen, role);
 	}
 
 	share *cmb1, *cmb2, *shr_cmp, *shr_out;
@@ -601,7 +590,7 @@ bool Party::compare(KV_type & kv1, KV_type & kv2, int)
 
 #define EXCHANGE(a, b) \
 	{ \
-		KV_type tmp = (a); \
+		KVpair tmp = (a); \
 		(a) = (b); \
 		(b) = tmp; \
 	}
@@ -666,7 +655,7 @@ void Party::Sort()
 
 				if(compare(shr_dataset[exc], shr_dataset[top]))
 					EXCHANGE(shr_dataset[top], shr_dataset[exc]);
-				
+
 				top = exc;
 			}
 		}
@@ -764,8 +753,8 @@ double Party::get_qi(size_t i, double eps2)
 	share *srv_i, *cli_i, *srv_j, *cli_j;
 	if(role == SERVER)
 	{
-		srv_i = bcirc->PutINGate(static_cast<uint32_t>(shr_dataset[i].count), bitlen, role);
-		srv_j = bcirc->PutINGate(static_cast<uint32_t>(shr_dataset[i+1].count), bitlen, role);
+		srv_i = bcirc->PutINGate(static_cast<uint32_t>(shr_dataset[i].second), bitlen, role);
+		srv_j = bcirc->PutINGate(static_cast<uint32_t>(shr_dataset[i+1].second), bitlen, role);
 		cli_i = bcirc->PutDummyINGate(bitlen);
 		cli_j = bcirc->PutDummyINGate(bitlen);
 	}
@@ -773,8 +762,8 @@ double Party::get_qi(size_t i, double eps2)
 	{
 		srv_i = bcirc->PutDummyINGate(bitlen);
 		srv_j = bcirc->PutDummyINGate(bitlen);
-		cli_i = bcirc->PutINGate(static_cast<uint32_t>(shr_dataset[i].count), bitlen, role);
-		cli_j = bcirc->PutINGate(static_cast<uint32_t>(shr_dataset[i+1].count), bitlen, role);
+		cli_i = bcirc->PutINGate(static_cast<uint32_t>(shr_dataset[i].second), bitlen, role);
+		cli_j = bcirc->PutINGate(static_cast<uint32_t>(shr_dataset[i+1].second), bitlen, role);
 	}
 
 	share *cmb_i, *cmb_j, *cmb_dif, *shr_out;
@@ -818,7 +807,7 @@ double Party::get_qi(size_t i, double eps2)
 		tsocket->Receive((void*)&qi_n, sizeof(qi_n));
 		tsocket->Close();
 	}
-	
+
 	return qi_n;
 }
 
@@ -879,10 +868,10 @@ uint64_t Party::RandomDraw(double mass)
 			uint64_t rnd2 = rand();
 			xrnd = rnd1 ^ rnd2;
 			xrnd &= mask;
-			
+
 			if(xrnd < M) break;
 		}
-		
+
 		tsocket->Send((void *)&xrnd, sizeof(xrnd));
 	}
 	else {
@@ -906,7 +895,7 @@ void Party::erase(vector<T> v, size_t i)
 	v.erase(v.begin() + i);
 	if(i >= len/2)
 		v.erase(v.end() - i);
-	else 
+	else
 		v.erase(v.end() - i - 1);
 }
 
@@ -921,7 +910,7 @@ vector<size_t> Party::random_draw_output(double eps_em)
 	shr_dataset.resize(this->shr_dataset.size() * 2);
 	size_t length(shr_dataset.size());
 	for(size_t i = 0; i < this->shr_dataset.size(); i ++)
-		shr_dataset[i] = this->shr_dataset[i].count;
+		shr_dataset[i] = this->shr_dataset[i].second;
 	for(size_t i = length; i < length * 2; i ++)
 		shr_dataset[i] = shr_dataset[2*length - i - 1];
 
@@ -1047,7 +1036,7 @@ void Party::RandomSelection()
 			tsocket->Receive((void *)&rnd2, sizeof(rnd2));
 
 			size_t sel = (rnd1 + rnd2) % shr_dataset.size();
-			if(!shr_dataset[sel].ID.empty()) out << shr_dataset[sel].ID << endl;
+			if(!shr_dataset[sel].first.empty()) out << shr_dataset[sel].first << endl;
 			shr_dataset.erase(shr_dataset.begin() + sel);
 		}
 	}
@@ -1066,11 +1055,11 @@ void Party::RandomSelection()
 			tsocket->Send((void *)&rnd2, sizeof(rnd2));
 
 			size_t sel = (rnd1 + rnd2) % shr_dataset.size();
-			if(!shr_dataset[sel].ID.empty()) out << shr_dataset[sel].ID << endl;
+			if(!shr_dataset[sel].first.empty()) out << shr_dataset[sel].first << endl;
 			shr_dataset.erase(shr_dataset.begin() + sel);
 		}
 	}
-	
+
 	out.close();
 	tsocket->Close();
 }

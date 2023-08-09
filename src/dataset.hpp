@@ -5,6 +5,9 @@
 #include <map>
 #include <bloom.h>
 
+// key value pair
+typedef std::pair<std::string, size_t> KVpair;
+
 class Itemset
 {
 	protected:
@@ -44,7 +47,8 @@ class HashDataset
 		std::string HashItemsetStupid(Itemset &itemset);
 
 	protected:
-		std::vector<std::pair<std::string, size_t>> hashdata;
+		std::vector<KVpair> hashdata;
+		std::vector<std::pair<std::string, std::vector<Itemset>>> hashstring_combination_data;
 
 		std::string HashItemsetIntoString(Itemset &itemset);
 
@@ -52,6 +56,14 @@ class HashDataset
 		HashDataset();
 		HashDataset(Dataset &original_dataset);
 		~HashDataset();
+
+		KVpair operator[](size_t);
+
+		void ReadOriginalDataset(Dataset &original_dataset);
+		size_t GetDatasetSize() const;
+		void PrintDataset() const;
+		void SortDataset();
+		void EraseFromIndexToEnd(size_t i);
 
 		/* struct bloom * BloomPack(size_t k); */
 		/* size_t BloomCheck(struct bloom * blm, size_t k); */

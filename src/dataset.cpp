@@ -1,11 +1,17 @@
 #include "dataset.hpp"
 #include "MurmurHash3.h"
 
+#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
+
 #include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <cassert>
 #include <cryptopp/md5.h>
+#include <cryptopp/files.h>
+#include <cryptopp/filters.h>
+#include <cryptopp/hex.h>
+#include <cryptopp/integer.h>
 using namespace std;
 
 Itemset::Itemset(std::string uncut_str, std::string seperator=",")
@@ -123,11 +129,11 @@ string HashDataset::HashItemsetStupid(Itemset &itemset)
 
 	std::string constr = itemset.ConcatenateWithOrder();
 	std::string digest;
-	Weak1::MD5 _hash;
+	Weak1::MD5 md5;
 
-	_hash.Update((const byte *)&constr[0], constr.size());
-	digest.resize(_hash.DigestSize());
-	_hash.Final((byte*)&digest[0]);
+	md5.Update((const CryptoPP::byte *)&constr[0], constr.size());
+	digest.resize(md5.DigestSize());
+	md5.Final((CryptoPP::byte*)&digest[0]);
 
 	return digest;
 }
@@ -142,6 +148,20 @@ HashDataset::HashDataset()
 }
 
 HashDataset::HashDataset(Dataset &original_dataset)
+{
+	this->ReadOriginalDataset(original_dataset);
+}
+
+HashDataset::~HashDataset()
+{
+}
+
+KVpair HashDataset::operator[](size_t i)
+{
+	return this->hashdata[i];
+}
+
+void HashDataset::ReadOriginalDataset(Dataset &original_dataset)
 {
 	map<string, size_t> hashdata_map;
 	for(size_t i = 0; i < original_dataset.GetDatasetSize(); i++)
@@ -183,6 +203,31 @@ HashDataset::HashDataset(Dataset &original_dataset)
 	);
 }
 
-HashDataset::~HashDataset()
+size_t HashDataset::GetDatasetSize() const
 {
+	return this->hashdata.size();
+}
+
+void HashDataset::PrintDataset() const
+{
+	for (size_t i = 0; i < this->hashdata.size(); i++)
+	{
+		cout << this->hashdata[i].first << "\t" << this->hashdata[i].second << endl;
+	}
+}
+
+void HashDataset::SortDataset()
+{
+	sort(
+		this->hashdata.begin(),
+		this->hashdata.end(),
+		[](KVpair &a, KVpair &b) {
+			return a.second > b.second;
+		}
+	);
+}
+
+void HashDataset::EraseFromIndexToEnd(size_t i)
+{
+	this->hashdata.erase(this->hashdata.begin() + i);
 }

@@ -19,9 +19,11 @@ struct Key {
 class Party
 {
 private:
-	Dataset dataset;
-	std::vector<KV_type> shr_dataset;
-	void print_dataset(std::string filename);
+	Dataset dataset_of_itemset; // dataset of itemsets
+	HashDataset dataset_of_combination;
+	std::vector<KVpair> shr_dataset;
+
+	void PrintSharedDataset(std::string filename);
 
 	struct /* ABYParty Parameters */
 	{
@@ -42,13 +44,11 @@ private:
 	double delta;
 
 	size_t prune_size;
-	std::vector<std::string> md5set;
-	void makeMD5set();
 	int MakeShareSrv(size_t & index, CSocket * tsocket);
 	int MakeShareCli(CSocket * tsocket);
 
-	bool compare(KV_type & kv1, KV_type & kv2);
-	bool compare(KV_type & kv1, KV_type & kv2, int);
+	bool compare(KVpair & kv1, KVpair & kv2);
+	bool compare(KVpair & kv1, KVpair & kv2, int);
 
 	double get_delta(size_t nr_users);
 	double get_delta_q(double delta, size_t kbar, double c);
@@ -88,8 +88,8 @@ public:
 	Party() {}
 	~Party() {}
 
-	void set_param(e_role role, std::string address, 
-		uint16_t port, seclvl seclevel, uint32_t bitlen, 
+	void set_param(e_role role, std::string address,
+		uint16_t port, seclvl seclevel, uint32_t bitlen,
 		uint32_t nthreads, e_mt_gen_alg mt_alg,
 		size_t k, size_t kbar, double eps, double p1,
 		double eps_em, double mu);
