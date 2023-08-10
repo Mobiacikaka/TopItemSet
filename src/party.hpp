@@ -19,8 +19,8 @@ struct Key {
 class Party
 {
 private:
-	Dataset dataset;
-	std::vector<KV_type> shr_dataset;
+	KVDataset kvdataset;
+	std::vector<KVpair> shr_dataset;
 	void print_dataset(std::string filename);
 
 	struct /* ABYParty Parameters */
@@ -47,8 +47,8 @@ private:
 	int MakeShareSrv(size_t & index, CSocket * tsocket);
 	int MakeShareCli(CSocket * tsocket);
 
-	bool compare(KV_type & kv1, KV_type & kv2);
-	bool compare(KV_type & kv1, KV_type & kv2, int);
+	bool compare(KVpair & kv1, KVpair & kv2);
+	bool compare(KVpair & kv1, KVpair & kv2, int);
 
 	double get_delta(size_t nr_users);
 	double get_delta_q(double delta, size_t kbar, double c);

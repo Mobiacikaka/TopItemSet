@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <map>
 #include <iostream>
 using namespace std;
 
@@ -42,6 +43,16 @@ void Itemset::PrintItemset() const
 	}
 }
 
+size_t Itemset::GetItemsetSize() const
+{
+	return this->data.size();
+}
+
+string Itemset::operator[](size_t i) const
+{
+	return this->data[i];
+}
+
 Dataset::Dataset()
 {
 	size_t num_users;
@@ -78,6 +89,58 @@ void Dataset::PruneDataset(size_t retainsize)
 	this->data.erase(this->data.begin() - retainsize, this->data.end());
 }
 
-// BloomFilter 
+// BloomFilter
 const size_t BLOOMFILTER_NUM_ENTRIES = 1000000;
 const float BLOOMFILTER_ERRORS_RATE = 0.01;
+
+void KVDataset::GenerateKVDataset(Dataset &original_dataset)
+{
+	map<string, size_t> kvdata_map;
+
+	this->kvdata.clear();
+
+	for(size_t i = 0; i < original_dataset.GetDatasetSize(); i++)
+	{
+		Itemset itemset(original_dataset[i]);
+		for (size_t j = 0; j < itemset.GetItemsetSize(); i++)
+			kvdata_map[itemset[j]] ++;
+	}
+
+	std::transform(
+			kvdata_map.begin(),
+			kvdata_map.end(),
+			std::back_inserter(this->kvdata),
+			[](const KVpair &p) {
+				return p;
+			}
+			);
+}
+
+size_t KVDataset::GetKVDatasetSize() const
+{
+	return this->kvdata.size();
+}
+
+void KVDataset::PrintKVDataset() const
+{
+	for(auto it = this->kvdata.begin(); it < this->kvdata.end(); it++)
+		cout << it->first << "\t" << it->second << endl;
+}
+
+void KVDataset::SortKVDataset()
+{
+	sort(this->kvdata.begin(),
+		this->kvdata.end(),
+		[](const KVpair &a, const KVpair &b) {return a.second > b.second;}
+	);
+}
+
+void KVDataset::EraseFrom(size_t index)
+{
+	this->kvdata.erase(this->kvdata.begin() + index);
+}
+
+KVpair & KVDataset::operator[](size_t i)
+{
+	return this->kvdata[i];
+}
