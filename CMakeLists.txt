@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
-project(scdptopk LANGUAGES CXX)
+project(topitemset LANGUAGES CXX)
 
 if (CMAKE_COMPILER_IS_GNUCXX AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8.0)
-    message(FATAL_ERROR "scdptopk requires at least g++-8")
+    message(FATAL_ERROR "topitemset requires at least g++-8")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")

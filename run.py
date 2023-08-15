@@ -4,20 +4,20 @@ from src.gm import generate_key
 
 dataset = 'gowalla'
 
-def build_scdptopk():
+def build_topitemset():
 	os.system('mkdir -p build')
 	os.system('cd build && cmake .. && make -j$(nproc)')
 
 def copy_file(folder_name):
-	os.system(f'cp ./build/scdptopk {dataset}/scdptopk')
+	os.system(f'cp ./build/topitemset {dataset}/topitemset')
 	os.system(f'cp ./datasets/{dataset}/server.txt {dataset}/')
 	os.system(f'cp ./datasets/{dataset}/client.txt {dataset}/')
 
 	os.system(f'mkdir -p {folder_name}')
 	os.system(f'mkdir -p {folder_name}/server')
 	os.system(f'mkdir -p {folder_name}/client')
-	os.system(f'cp ./build/scdptopk {folder_name}/server')
-	os.system(f'cp ./build/scdptopk {folder_name}/client')
+	os.system(f'cp ./build/topitemset {folder_name}/server')
+	os.system(f'cp ./build/topitemset {folder_name}/client')
 	os.system(f'cp ./datasets/{dataset}/server.txt {folder_name}/server/dataset.txt')
 	os.system(f'cp ./datasets/{dataset}/client.txt {folder_name}/client/dataset.txt')
 	os.system(f'touch ./{folder_name}/server/Selection.out')
@@ -38,9 +38,9 @@ def copy_key(folder_name):
 	print_key()
 	os.system(f'mv key.txt {folder_name}/server/')
 
-def run_scdptopk(folder_name, eps, k, kbar, mu):
-	os.system(f'cd ./{folder_name}/server && ./scdptopk -2 {eps} -k {k} -1 {kbar} -m {mu} -r 0 >/dev/null 2>&1 &')
-	os.system(f'cd ./{folder_name}/client && ./scdptopk -2 {eps} -k {k} -1 {kbar} -m {mu} -r 1 >/dev/null 2>&1')
+def run_topitemset(folder_name, eps, k, kbar, mu):
+	os.system(f'cd ./{folder_name}/server && ./topitemset -2 {eps} -k {k} -1 {kbar} -m {mu} -r 0 >/dev/null 2>&1 &')
+	os.system(f'cd ./{folder_name}/client && ./topitemset -2 {eps} -k {k} -1 {kbar} -m {mu} -r 1 >/dev/null 2>&1')
 
 def cal_metric(folder_name, k):
 	sel_srv = open(f'./{folder_name}/server/Selection.out')
@@ -90,15 +90,15 @@ def cal_metric(folder_name, k):
 def remove_files(eps, k, kbar, mu, times):
 	folder_name = f'eps_{eps}_k_{k}_kbar_{kbar}_mu_{mu}_times_{times}'
 	os.system(f'rm {folder_name}/server/dataset.txt')
-	os.system(f'rm {folder_name}/server/scdptopk')
+	os.system(f'rm {folder_name}/server/topitemset')
 	os.system(f'rm {folder_name}/client/dataset.txt')
-	os.system(f'rm {folder_name}/client/scdptopk')
+	os.system(f'rm {folder_name}/client/topitemset')
 
 def one_run(eps, k, kbar, mu, times):
 	folder_name = f'eps_{eps}_k_{k}_kbar_{kbar}_mu_{mu}_times_{times}'
 	copy_file(folder_name)
 	copy_key(folder_name)
-	run_scdptopk(folder_name, eps, k, kbar, mu)
+	run_topitemset(folder_name, eps, k, kbar, mu)
 	return cal_metric(folder_name, k)
 
 if __name__ == '__main__':
@@ -117,7 +117,7 @@ if __name__ == '__main__':
 	]
 
 	os.system(f'mkdir -p {dataset}')
-	build_scdptopk()
+	build_topitemset()
 
 	for arg in args:
 		eps, k, kbar, mu = arg
