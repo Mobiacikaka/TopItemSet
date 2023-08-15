@@ -9,9 +9,9 @@ using namespace std;
 Itemset::Itemset(std::string uncut_str, std::string seperator=",")
 {
 	size_t begin(0), end(0);
-	while(end < uncut_str.size())
+	while(begin < uncut_str.size())
 	{
-		end = uncut_str.find(seperator);
+		end = uncut_str.find(seperator, begin);
 		if(end != std::string::npos)
 		{
 			data.push_back(uncut_str.substr(begin, end-begin));
@@ -19,9 +19,9 @@ Itemset::Itemset(std::string uncut_str, std::string seperator=",")
 		else
 		{
 			data.push_back(uncut_str.substr(begin));
+			break;
 		}
-		begin = end;
-		end += 1;
+		begin = end + 1;
 	}
 }
 
@@ -102,7 +102,7 @@ void KVDataset::GenerateKVDataset(Dataset &original_dataset)
 	for(size_t i = 0; i < original_dataset.GetDatasetSize(); i++)
 	{
 		Itemset itemset(original_dataset[i]);
-		for (size_t j = 0; j < itemset.GetItemsetSize(); i++)
+		for (size_t j = 0; j < itemset.GetItemsetSize(); j++)
 			kvdata_map[itemset[j]] ++;
 	}
 

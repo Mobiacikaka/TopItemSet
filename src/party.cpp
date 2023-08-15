@@ -125,10 +125,15 @@ void Party::Run()
 	clock_t global_start = clock();
 #endif
 
+	clog << "Running TopItemSet" << endl;
 	Dataset original_dataset;
+	original_dataset.PrintDataset();
 
 	kvdataset.GenerateKVDataset(original_dataset);
 	kvdataset.SortKVDataset();
+	kvdataset.PrintKVDataset();
+	return;
+
 	// FIXME what size should be set
 	delta = this->get_delta(kvdataset.GetKVDatasetSize());
 
@@ -141,7 +146,6 @@ void Party::Run()
 #ifdef COUNT_TIME
 	clock_t prune_end = clock();
 #endif
-	/* kvdataset.print("Prune.out"); */
 	clog << "Prune Finished" << endl;
 
 #ifdef COUNT_TIME
@@ -151,7 +155,7 @@ void Party::Run()
 #ifdef COUNT_TIME
 	clock_t merge_end = clock();
 #endif
-	this->print_dataset("Merge.out");
+	/* this->print_dataset("Merge.out"); */
 	clog << "Merge Finished" << endl;
 
 #ifdef COUNT_TIME
@@ -161,7 +165,7 @@ void Party::Run()
 #ifdef COUNT_TIME
 	clock_t sort_end = clock();
 #endif
-	this->print_dataset("Sort.out");
+	/* this->print_dataset("Sort.out"); */
 	clog << "Sort Finished" << endl;
 
 #ifdef COUNT_TIME
