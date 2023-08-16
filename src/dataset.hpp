@@ -20,6 +20,9 @@ class Itemset
 		void PrintItemset() const;
 		size_t GetItemsetSize() const;
 		std::string operator[](size_t i) const;
+
+		std::vector<std::string> PruneItemset(std::vector<std::string>) const;
+		std::string ConcatWithOrder() const;
 };
 
 class Dataset
@@ -29,6 +32,7 @@ class Dataset
 
 	public:
 		Dataset();
+		Dataset(std::vector<Itemset> &data);
 		~Dataset() {}
 
 		Itemset & operator[](size_t i);
@@ -36,9 +40,7 @@ class Dataset
 		size_t GetDatasetSize() const;
 		void PrintDataset() const;
 		void PruneDataset(size_t );
-
-		/* struct bloom * BloomPack(size_t k); */
-		/* size_t BloomCheck(struct bloom * blm, size_t k); */
+		std::vector<Itemset> PruneItemset(std::vector<std::string>) const;
 };
 
 class KVDataset
@@ -53,6 +55,7 @@ class KVDataset
 		KVpair &operator[](size_t);
 
 		void GenerateKVDataset(Dataset &original_dataset);
+		void GenerateKVDataset(Dataset &original_dataset, bool);
 		size_t GetKVDatasetSize() const;
 		void PrintKVDataset() const;
 		void SortKVDataset();

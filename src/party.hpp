@@ -5,6 +5,7 @@
 #include <abycore/aby/abyparty.h>
 #include <string>
 #include <vector>
+#include <map>
 #include <cryptopp/integer.h>
 
 struct Key {
@@ -43,6 +44,7 @@ private:
 
 	size_t prune_size;
 	std::vector<std::string> md5set;
+	std::map<std::string, KVpair> md5map;
 	void makeMD5set();
 	int MakeShareSrv(size_t & index, CSocket * tsocket);
 	int MakeShareCli(CSocket * tsocket);
@@ -62,6 +64,10 @@ private:
 	uint64_t RandomDraw(double mass);
 	std::vector<size_t> random_draw_output(double eps_em);
 	void RandomSelection();
+
+	std::vector<size_t> topkindex;
+	std::vector<std::string> topkitem;
+	void MakeTopKPublic();
 
 	const int M = 1000;
 	double mu = 0.9;

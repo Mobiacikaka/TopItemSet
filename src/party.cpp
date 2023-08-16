@@ -27,7 +27,7 @@ const vector<int> H = {1,2,3,4,5};
 const size_t prune_times = 3;
 #define MASK 0xFFFF
 
-#define COUNT_TIME
+/* #define COUNT_TIME */
 
 #ifdef COUNT_TIME
 #define WRITE_TIME_FMT(file, name)	\
@@ -127,18 +127,17 @@ void Party::Run()
 
 	clog << "Running TopItemSet" << endl;
 	Dataset original_dataset;
-	original_dataset.PrintDataset();
 
 	kvdataset.GenerateKVDataset(original_dataset);
 	kvdataset.SortKVDataset();
-	kvdataset.PrintKVDataset();
-	return;
 
 	// FIXME what size should be set
 	delta = this->get_delta(kvdataset.GetKVDatasetSize());
 
 	clog << "Ready for calculate" << endl;
 
+
+	clog << "Prune Start" << endl;
 #ifdef COUNT_TIME
 	clock_t prune_start = clock();
 #endif
@@ -146,8 +145,11 @@ void Party::Run()
 #ifdef COUNT_TIME
 	clock_t prune_end = clock();
 #endif
+	this->kvdataset.PrintKVDataset();
 	clog << "Prune Finished" << endl;
 
+
+	clog << "Merge Start" << endl;
 #ifdef COUNT_TIME
 	clock_t merge_start = clock();
 #endif
@@ -155,9 +157,11 @@ void Party::Run()
 #ifdef COUNT_TIME
 	clock_t merge_end = clock();
 #endif
-	/* this->print_dataset("Merge.out"); */
+	this->kvdataset.PrintKVDataset();
 	clog << "Merge Finished" << endl;
 
+
+	clog << "Sort Start" << endl;
 #ifdef COUNT_TIME
 	clock_t sort_start = clock();
 #endif
@@ -165,9 +169,11 @@ void Party::Run()
 #ifdef COUNT_TIME
 	clock_t sort_end = clock();
 #endif
-	/* this->print_dataset("Sort.out"); */
+	this->print_dataset("Sort.out");
 	clog << "Sort Finished" << endl;
 
+
+	clog << "Selection Start" << endl;
 #ifdef COUNT_TIME
 	clock_t selec_start = clock();
 #endif
@@ -175,11 +181,11 @@ void Party::Run()
 #ifdef COUNT_TIME
 	clock_t selec_end = clock();
 #endif
+	this->print_dataset("Selection.out");
 	clog << "Selection Finished" << endl;
 
 #ifdef COUNT_TIME
 	clock_t global_end = clock();
-
 	// runtime << (double)(global_end - global_start) / CLOCKS_PER_SEC << endl;
 	WRITE_TIME_FMT(runtime, prune)
 	WRITE_TIME_FMT(runtime, merge)
@@ -188,11 +194,52 @@ void Party::Run()
 	WRITE_TIME_FMT(runtime, global)
 	runtime.close();
 #endif
+
+	// Top K Item Set Selection
+	auto pruneitemset = original_dataset.PruneItemset(this->topkitem);
+	Dataset newdataset(pruneitemset);
+	newdataset.PrintDataset();
+
+	this->kvdataset.GenerateKVDataset(newdataset);
+	kvdataset.SortKVDataset();
+	delta = this->get_delta(kvdataset.GetKVDatasetSize());
+
+	clog << "Ready for calculate" << endl;
+
+
+	clog << "Prune Start" << endl;
+	this->Prune();
+	this->kvdataset.PrintKVDataset();
+	clog << "Prune Finished" << endl;
+
+
+	clog << "Merge Start" << endl;
+	this->Merge();
+	this->kvdataset.PrintKVDataset();
+	clog << "Merge Finished" << endl;
+
+
+	clog << "Sort Start" << endl;
+	this->Sort();
+	this->print_dataset("Sort.out");
+	clog << "Sort Finished" << endl;
+
+
+	clog << "Selection Start" << endl;
+	this->Selection();
+	this->print_dataset("Selection.out");
+	clog << "Selection Finished" << endl;
+
 }
 
 
 struct Key Party::read_key() {
 	ifstream f("key.txt");
+	if(!f.is_open())
+	{
+		clog << "key.txt not exist" << endl;
+		exit(0);
+	}
 	struct Key key;
 	f >> key.pub.n;
 	f >> key.pub.y;
@@ -432,6 +479,7 @@ void Party::makeMD5set()
 		hash.Final((CryptoPP::byte*)&digest[0]);
 
 		md5set.push_back(digest);
+		md5map[digest] = kvdataset[i];
 	}
 }
 
@@ -1053,6 +1101,7 @@ void Party::RandomSelection()
 			tsocket->Receive((void *)&rnd2, sizeof(rnd2));
 
 			size_t sel = (rnd1 + rnd2) % shr_dataset.size();
+			this->topkindex.push_back(sel);
 			if(!shr_dataset[sel].first.empty()) out << shr_dataset[sel].first << endl;
 			shr_dataset.erase(shr_dataset.begin() + sel);
 		}
@@ -1072,6 +1121,7 @@ void Party::RandomSelection()
 			tsocket->Send((void *)&rnd2, sizeof(rnd2));
 
 			size_t sel = (rnd1 + rnd2) % shr_dataset.size();
+			this->topkindex.push_back(sel);
 			if(!shr_dataset[sel].first.empty()) out << shr_dataset[sel].first << endl;
 			shr_dataset.erase(shr_dataset.begin() + sel);
 		}
@@ -1081,7 +1131,7 @@ void Party::RandomSelection()
 	tsocket->Close();
 }
 
-// vector<size_t> Party::Selection(const size_t k, const size_t kbar, const double epsilon, const double p1, const double eps_em, const double delta)
+
 void Party::Selection()
 {
 	double eps1, eps2;
@@ -1128,3 +1178,63 @@ void Party::Selection()
 	// assert(0);
 	return;
 }
+
+
+void Party::MakeTopKPublic()
+{
+	unique_ptr<CSocket> tsocket;
+	string md5str;
+	string itemid;
+	size_t idlength;
+
+	if(this->role == SERVER) {
+		tsocket = Listen(address, port);
+		if(!tsocket) {
+			cerr << "Listen Failed" << endl;
+			exit(1);
+		}
+
+		for(size_t i = 0; i < this->shr_dataset.size(); i++) {
+			md5str = this->shr_dataset[i].first;
+			if(md5str.empty() == true) {
+				tsocket->Receive((void *)&idlength, sizeof(idlength));
+				itemid.resize(idlength);
+				tsocket->Receive((void *)&itemid[0], idlength);
+			}
+			else {
+				itemid = md5map[md5str].first;
+				idlength = itemid.size();
+				tsocket->Send((void *)&idlength, sizeof(idlength));
+				tsocket->Send((void *)itemid.c_str(), itemid.size());
+			}
+			this->topkitem.push_back(itemid);
+		}
+	}
+	else {
+		tsocket = Connect(address, port);
+		if(!tsocket) {
+			cerr << "Listen Failed" << endl;
+			exit(1);
+		}
+
+		for(size_t i = 0; i < this->shr_dataset.size(); i++) {
+			md5str = shr_dataset[i].first;
+			if(md5str.empty() == false) {
+				itemid = md5map[md5str].first;
+				idlength = itemid.size();
+				tsocket->Send((void *)&idlength, sizeof(idlength));
+				tsocket->Send((void *)itemid.c_str(), itemid.size());
+			}
+			else {
+				tsocket->Receive((void *)&idlength, sizeof(idlength));
+				itemid.resize(idlength);
+				tsocket->Receive((void *)&itemid[0], idlength);
+			}
+			this->topkitem.push_back(itemid);
+		}
+	}
+
+	tsocket->Close();
+}
+
+
