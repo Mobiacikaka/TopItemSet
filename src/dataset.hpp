@@ -40,7 +40,7 @@ class Dataset
 		size_t GetDatasetSize() const;
 		void PrintDataset() const;
 		void PruneDataset(size_t );
-		std::vector<Itemset> PruneItemset(std::vector<std::string>) const;
+		std::vector<Itemset> PruneDataset(std::vector<std::string>) const;
 };
 
 class KVDataset

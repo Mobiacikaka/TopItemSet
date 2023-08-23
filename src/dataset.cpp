@@ -73,7 +73,7 @@ string Itemset::ConcatWithOrder() const
 	vector<string> sorted(this->data);
 	sort(sorted.begin(), sorted.end());
 	for(size_t i = 0; i < sorted.size(); i++)
-		concatstr += sorted[i];
+		concatstr = concatstr + sorted[i] + ",";
 	return concatstr;
 }
 
@@ -119,7 +119,7 @@ void Dataset::PruneDataset(size_t retainsize)
 }
 
 
-vector<Itemset> Dataset::PruneItemset(vector<string> item_remove_exception) const
+vector<Itemset> Dataset::PruneDataset(vector<string> item_remove_exception) const
 {
 	vector<Itemset> newdata;
 	for(size_t i = 0; i < this->data.size(); i ++) {

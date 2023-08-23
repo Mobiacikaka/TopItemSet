@@ -27,13 +27,6 @@ const vector<int> H = {1,2,3,4,5};
 const size_t prune_times = 3;
 #define MASK 0xFFFF
 
-/* #define COUNT_TIME */
-
-#ifdef COUNT_TIME
-#define WRITE_TIME_FMT(file, name)	\
-	(file) << (double)(name ## _end - name ## _start) / CLOCKS_PER_SEC << endl;
-#endif
-
 void Party::set_param(
 	e_role role,
 	std::string address,
@@ -118,118 +111,78 @@ double Party::get_delta(size_t nr_users)
 	return delta;
 }
 
-void Party::Run()
+void Party::CalculateTopKItem(Dataset & original_dataset)
 {
-#ifdef COUNT_TIME
-	ofstream runtime("Runtime.out");
-	clock_t global_start = clock();
-#endif
+	clog << "Running CalculateTopKItem" << endl;
 
-	clog << "Running TopItemSet" << endl;
-	Dataset original_dataset;
-
-	kvdataset.GenerateKVDataset(original_dataset);
-	kvdataset.SortKVDataset();
+	this->kvdataset.GenerateKVDataset(original_dataset);
+	this->kvdataset.SortKVDataset();
 
 	// FIXME what size should be set
-	delta = this->get_delta(kvdataset.GetKVDatasetSize());
-
-	clog << "Ready for calculate" << endl;
-
+	delta = this->get_delta(this->kvdataset.GetKVDatasetSize());
 
 	clog << "Prune Start" << endl;
-#ifdef COUNT_TIME
-	clock_t prune_start = clock();
-#endif
 	this->Prune();
-#ifdef COUNT_TIME
-	clock_t prune_end = clock();
-#endif
 	this->kvdataset.PrintKVDataset();
 	clog << "Prune Finished" << endl;
 
-
 	clog << "Merge Start" << endl;
-#ifdef COUNT_TIME
-	clock_t merge_start = clock();
-#endif
 	this->Merge();
-#ifdef COUNT_TIME
-	clock_t merge_end = clock();
-#endif
 	this->kvdataset.PrintKVDataset();
 	clog << "Merge Finished" << endl;
 
-
 	clog << "Sort Start" << endl;
-#ifdef COUNT_TIME
-	clock_t sort_start = clock();
-#endif
 	this->Sort();
-#ifdef COUNT_TIME
-	clock_t sort_end = clock();
-#endif
 	this->print_dataset("Sort.out");
 	clog << "Sort Finished" << endl;
 
+	/* clog << "Selection Start" << endl; */
+	/* this->Selection(); */
+	/* this->print_dataset("Selection.out"); */
+	/* clog << "Selection Finished" << endl; */
+}
 
-	clog << "Selection Start" << endl;
-#ifdef COUNT_TIME
-	clock_t selec_start = clock();
-#endif
-	this->Selection();
-#ifdef COUNT_TIME
-	clock_t selec_end = clock();
-#endif
-	this->print_dataset("Selection.out");
-	clog << "Selection Finished" << endl;
-
-#ifdef COUNT_TIME
-	clock_t global_end = clock();
-	// runtime << (double)(global_end - global_start) / CLOCKS_PER_SEC << endl;
-	WRITE_TIME_FMT(runtime, prune)
-	WRITE_TIME_FMT(runtime, merge)
-	WRITE_TIME_FMT(runtime, sort)
-	WRITE_TIME_FMT(runtime, selec)
-	WRITE_TIME_FMT(runtime, global)
-	runtime.close();
-#endif
+void Party::CalculateTopKItemSet(Dataset & original_dataset)
+{
+	clog << "CalculateTopKItemSet" << endl;
 
 	// Top K Item Set Selection
-	auto pruneitemset = original_dataset.PruneItemset(this->topkitem);
-	Dataset newdataset(pruneitemset);
+	this->MakeTopKPublic();
+	vector<Itemset> prune_dataset = original_dataset.PruneDataset(this->topkitem);
+	Dataset newdataset(prune_dataset);
 	newdataset.PrintDataset();
 
 	this->kvdataset.GenerateKVDataset(newdataset);
 	kvdataset.SortKVDataset();
 	delta = this->get_delta(kvdataset.GetKVDatasetSize());
 
-	clog << "Ready for calculate" << endl;
-
-
 	clog << "Prune Start" << endl;
 	this->Prune();
 	this->kvdataset.PrintKVDataset();
 	clog << "Prune Finished" << endl;
-
 
 	clog << "Merge Start" << endl;
 	this->Merge();
 	this->kvdataset.PrintKVDataset();
 	clog << "Merge Finished" << endl;
 
-
 	clog << "Sort Start" << endl;
 	this->Sort();
 	this->print_dataset("Sort.out");
 	clog << "Sort Finished" << endl;
 
-
 	clog << "Selection Start" << endl;
 	this->Selection();
 	this->print_dataset("Selection.out");
 	clog << "Selection Finished" << endl;
+}
 
+void Party::Run()
+{
+	Dataset original_dataset;
+
+	this->CalculateTopKItem(original_dataset);
+	this->CalculateTopKItemSet(original_dataset);
 }
 
 

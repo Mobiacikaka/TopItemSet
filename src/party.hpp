@@ -83,6 +83,9 @@ private:
 	size_t __select_pivot(size_t low, size_t high);
 	void SecurePartition();
 
+	void CalculateTopKItem(Dataset & original_dataset);
+	void CalculateTopKItemSet(Dataset & original_dataset);
+
 protected:
 	void Prune();
 	void Merge();
