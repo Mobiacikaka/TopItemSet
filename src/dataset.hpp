@@ -13,7 +13,7 @@ class Itemset
 		std::vector<std::string> data;
 
 	public:
-		Itemset(std::string uncut_str, std::string seperator);
+		Itemset(std::string uncut_str, char);
 		Itemset(std::vector<std::string> cut_str);
 		~Itemset() {}
 
@@ -21,7 +21,7 @@ class Itemset
 		size_t GetItemsetSize() const;
 		std::string operator[](size_t i) const;
 
-		std::vector<std::string> PruneItemset(std::vector<std::string>) const;
+		void PruneItemset(std::vector<std::string>) ;
 		std::string ConcatWithOrder() const;
 };
 
@@ -39,7 +39,7 @@ class Dataset
 
 		size_t GetDatasetSize() const;
 		void PrintDataset() const;
-		std::vector<Itemset> PruneDataset(std::vector<std::string>) const;
+		void PruneDataset(std::vector<std::string>);
 };
 
 class KVDataset
@@ -56,7 +56,8 @@ class KVDataset
 		void GenerateKVDataset(Dataset &original_dataset);
 		void GenerateKVDataset(Dataset &original_dataset, bool);
 		size_t GetKVDatasetSize() const;
-		void PrintKVDataset() const;
+		void PrintKVDataset(std::ostream &out) const;
+		void PrintKVDataset(std::string filename="") const;
 		void SortKVDataset();
 		void EraseFrom(size_t index);
 };

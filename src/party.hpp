@@ -22,7 +22,8 @@ class Party
 private:
 	KVDataset kvdataset;
 	std::vector<KVpair> shr_dataset;
-	void print_dataset(std::string filename);
+	void PrintShareDataset(std::ostream &out);
+	void PrintShareDataset(std::string filename);
 
 	struct /* ABYParty Parameters */
 	{

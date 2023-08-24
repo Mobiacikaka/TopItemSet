@@ -5,24 +5,17 @@
 #include <map>
 #include <iostream>
 #include <cassert>
+#include <bits/stdc++.h>
 using namespace std;
 
-Itemset::Itemset(std::string uncut_str, std::string seperator=",")
+Itemset::Itemset(std::string uncut_str, char del='\t')
 {
-	size_t begin(0), end(0);
-	while(begin < uncut_str.size())
-	{
-		end = uncut_str.find(seperator, begin);
-		if(end != std::string::npos)
-		{
-			data.push_back(uncut_str.substr(begin, end-begin));
-		}
-		else
-		{
-			data.push_back(uncut_str.substr(begin));
-			break;
-		}
-		begin = end + 1;
+	// https://www.geeksforgeeks.org/how-to-split-a-string-in-cc-python-and-java/
+	stringstream ss(uncut_str);
+	string word;
+	while (!ss.eof()) {
+		getline(ss, word, del);
+		this->data.push_back(word);
 	}
 }
 
@@ -34,14 +27,11 @@ Itemset::Itemset(std::vector<std::string> cut_str)
 void Itemset::PrintItemset() const
 {
 	size_t length = this->data.size();
-	for (size_t i = 0; i < length - 1; i ++)
+	for (size_t i = 0; i < length; i ++)
 	{
 		cout << this->data[i] << ",";
 	}
-	if(length > 0)
-	{
-		cout << this->data[length - 1] << endl;
-	}
+	cout << endl;
 }
 
 size_t Itemset::GetItemsetSize() const
@@ -54,7 +44,7 @@ string Itemset::operator[](size_t i) const
 	return this->data[i];
 }
 
-vector<string> Itemset::PruneItemset(vector<string> item_remove_exception) const
+void Itemset::PruneItemset(vector<string> item_remove_exception) 
 {
 	vector<string> newdata;
 	for(size_t i = 0; i < this->data.size(); i ++) {
@@ -63,9 +53,10 @@ vector<string> Itemset::PruneItemset(vector<string> item_remove_exception) const
 			item_remove_exception.end(),
 			this->data[i]
 		);
-		if(it != item_remove_exception.end()) newdata.push_back(*it);
+		if(it != item_remove_exception.end()) newdata.push_back(this->data[i]);
 	}
-	return newdata;
+	this->data = newdata;
+	return ;
 }
 
 string Itemset::ConcatWithOrder() const
@@ -85,7 +76,7 @@ Dataset::Dataset()
 	for(size_t i = 0; i < num_users; i ++)
 	{
 		string uncut_itemset_str;
-		cin >> uncut_itemset_str;
+		getline(cin, uncut_itemset_str, '\n');
 		Itemset itemset(uncut_itemset_str);
 		this->data.push_back(itemset);
 	}
@@ -114,15 +105,16 @@ void Dataset::PrintDataset() const
 	}
 }
 
-vector<Itemset> Dataset::PruneDataset(vector<string> item_remove_exception) const
+void Dataset::PruneDataset(vector<string> item_remove_exception) 
 {
 	assert(item_remove_exception.size() > 0);
 	vector<Itemset> newdata;
 	for(size_t i = 0; i < this->data.size(); i ++) {
-		Itemset newitemset(this->data[i].PruneItemset(item_remove_exception));
-		newdata.push_back(newitemset);
+		this->data[i].PruneItemset(item_remove_exception);
+		if(this->data[i].GetItemsetSize()) newdata.push_back(this->data[i]);
 	}
-	return newdata;
+	this->data = newdata;
+	return;
 }
 
 // BloomFilter
@@ -188,10 +180,20 @@ size_t KVDataset::GetKVDatasetSize() const
 	return this->kvdata.size();
 }
 
-void KVDataset::PrintKVDataset() const
+void KVDataset::PrintKVDataset(ostream &out=std::cout) const
 {
 	for(auto it = this->kvdata.begin(); it < this->kvdata.end(); it++)
-		cout << it->first << "\t" << it->second << endl;
+		out << it->first << "\t" << it->second << endl;
+}
+
+void KVDataset::PrintKVDataset(std::string filename) const
+{
+	ofstream file(filename);
+	if(file.is_open() == false) {
+		cerr << filename << " open failed" << endl;
+		exit(-1);
+	}
+	this->PrintKVDataset(file);
 }
 
 void KVDataset::SortKVDataset()
