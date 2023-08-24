@@ -4,6 +4,7 @@
 #include <fstream>
 #include <map>
 #include <iostream>
+#include <cassert>
 using namespace std;
 
 Itemset::Itemset(std::string uncut_str, std::string seperator=",")
@@ -113,14 +114,9 @@ void Dataset::PrintDataset() const
 	}
 }
 
-void Dataset::PruneDataset(size_t retainsize)
-{
-	this->data.erase(this->data.begin() - retainsize, this->data.end());
-}
-
-
 vector<Itemset> Dataset::PruneDataset(vector<string> item_remove_exception) const
 {
+	assert(item_remove_exception.size() > 0);
 	vector<Itemset> newdata;
 	for(size_t i = 0; i < this->data.size(); i ++) {
 		Itemset newitemset(this->data[i].PruneItemset(item_remove_exception));
@@ -161,10 +157,11 @@ void KVDataset::GenerateKVDataset(Dataset &original_dataset, bool)
 	map<string, size_t> hashmap;
 	this->kvdata.clear();
 	for(size_t i = 0; i < original_dataset.GetDatasetSize(); i++) {
+		assert(original_dataset[i].GetItemsetSize() > 0);
 		size_t itemsetlength(original_dataset[i].GetItemsetSize());
-		for(size_t selectionsize = 1; selectionsize < itemsetlength; itemsetlength ++) {
+		for(size_t selectionsize = 1; selectionsize <= itemsetlength; selectionsize ++) {
 			string bitmask(selectionsize, 1);
-			bitmask.resize(itemsetlength);
+			bitmask.resize(itemsetlength, 0);
 			do {
 				vector<string> combination;
 				for(size_t j = 0; j < itemsetlength; j ++)

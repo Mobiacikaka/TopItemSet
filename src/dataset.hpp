@@ -39,7 +39,6 @@ class Dataset
 
 		size_t GetDatasetSize() const;
 		void PrintDataset() const;
-		void PruneDataset(size_t );
 		std::vector<Itemset> PruneDataset(std::vector<std::string>) const;
 };
 
