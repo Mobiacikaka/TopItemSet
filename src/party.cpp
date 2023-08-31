@@ -127,17 +127,17 @@ void Party::CalculateTopKItem(Dataset & original_dataset)
 
 	clog << "Prune Start" << endl;
 	this->Prune();
-	this->kvdataset.PrintKVDataset("Item_Prune.out");
+	this->kvdataset.PrintKVDataset("item_prune.out");
 	clog << "Prune Finished" << endl;
 
 	clog << "Merge Start" << endl;
 	this->Merge();
-	this->PrintShareDataset("Item_Merge.out");
+	this->PrintShareDataset("item_merge.out");
 	clog << "Merge Finished" << endl;
 
 	clog << "Sort Start" << endl;
 	this->Sort();
-	this->PrintShareDataset("Item_Sort.out");
+	this->PrintShareDataset("item_sort.out");
 	clog << "Sort Finished" << endl;
 
 	/* clog << "Selection Start" << endl; */
@@ -147,31 +147,35 @@ void Party::CalculateTopKItem(Dataset & original_dataset)
 
 void Party::CalculateTopKItemSet(Dataset & original_dataset)
 {
-	clog << endl << "CalculateTopKItemSet" << endl;
+	clog << endl << "Running CalculateTopKItemSet" << endl;
 
-	// Top K Item Set Selection
+	/* Top K Item Set Selection */
+	/* this->PrintShareDataset(std::cout); */
 	this->MakeTopKPublic();
+	for(size_t i = 0; i < this->topkitem.size(); i++)
+		cout << this->topkitem[i] << "\t"; cout << endl;
+	assert(this->topkitem.size());
 	original_dataset.PruneDataset(this->topkitem);
-	/* for(auto it = prune_dataset.begin(); it < prune_dataset.end(); it ++) it->PrintItemset(); return; */
+	/* original_dataset.PrintDataset(); */
 
 	this->kvdataset.GenerateKVDataset(original_dataset, true);
 	this->kvdataset.SortKVDataset();
-	this->kvdataset.PrintKVDataset(std::cout);
+	/* this->kvdataset.PrintKVDataset(std::cout); */
 	delta = this->get_delta(kvdataset.GetKVDatasetSize());
 
 	clog << "Prune Start" << endl;
 	this->Prune();
-	this->kvdataset.PrintKVDataset("Itemset_Prune.out");
+	this->kvdataset.PrintKVDataset("itemset_prune.out");
 	clog << "Prune Finished" << endl;
 
 	clog << "Merge Start" << endl;
 	this->Merge();
-	this->PrintShareDataset("Itemset_Merge.out");
+	this->PrintShareDataset("itemset_merge.out");
 	clog << "Merge Finished" << endl;
 
 	clog << "Sort Start" << endl;
 	this->Sort();
-	this->PrintShareDataset("Itemset_Sort.out");
+	this->PrintShareDataset("itemset_sort.out");
 	clog << "Sort Finished" << endl;
 
 	clog << "Selection Start" << endl;
@@ -427,6 +431,7 @@ void Party::makeMD5set()
 {
 	this->md5set.clear();
 	this->md5map.clear();
+	assert(this->md5set.size() == 0 && this->md5map.size() == 0);
 	using namespace CryptoPP;
 	for(size_t i = 0; i < kvdataset.GetKVDatasetSize(); i ++) {
 		string ID = kvdataset[i].first;
@@ -471,7 +476,7 @@ int Party::MakeShareCli(CSocket * tsocket)
 	if(index < kvdataset.GetKVDatasetSize())
 	{
 		if(index < prune_size) prune_size --;
-		kvdataset.EraseFrom(index);
+		this->kvdataset.Erase(index);
 		md5set.erase(md5set.begin() + index);
 	}
 
@@ -482,6 +487,9 @@ void Party::Merge()
 {
 	unique_ptr<CSocket> tsocket;
 	makeMD5set();
+	this->shr_dataset.clear();
+
+	size_t len;
 
 	if(role == SERVER)
 	{
@@ -491,15 +499,16 @@ void Party::Merge()
 			exit(1);
 		}
 
-		for(size_t i = 0; i < prune_size; i ++)
+		len = prune_size < this->kvdataset.GetKVDatasetSize() ? prune_size : this->kvdataset.GetKVDatasetSize();
+		tsocket->Send((void *)&len, sizeof(len));
+		for(size_t i = 0; i < len; i ++)
 		{
 			KVpair tmp_kv(kvdataset[i].first, MakeShareSrv(i, tsocket.get()));
 			shr_dataset.push_back(tmp_kv);
 		}
 
-		size_t left;
-		tsocket->Receive((void *)&left, sizeof(left));
-		for(size_t i = 0; i < left; i ++) {
+		tsocket->Receive((void *)&len, sizeof(len));
+		for(size_t i = 0; i < len; i ++) {
 			KVpair tmp_kv("", MakeShareCli(tsocket.get()));
 			shr_dataset.push_back(tmp_kv);
 		}
@@ -511,15 +520,16 @@ void Party::Merge()
 			exit(1);
 		}
 
-		size_t len = prune_size;
+		tsocket->Receive((void *)&len, sizeof(len));
 		for(size_t i = 0; i < len; i ++)
 		{
 			KVpair tmp_kv("", MakeShareCli(tsocket.get()));
 			shr_dataset.push_back(tmp_kv);
 		}
 
-		tsocket->Send((void *)&prune_size, sizeof(prune_size));
-		for(size_t i = 0; i < prune_size; i++)
+		len = prune_size;
+		tsocket->Send((void *)&len, sizeof(len));
+		for(size_t i = 0; i < len; i++)
 		{
 			KVpair tmp_kv(kvdataset[i].first, MakeShareSrv(i, tsocket.get()));
 			shr_dataset.push_back(tmp_kv);
@@ -1060,7 +1070,6 @@ void Party::RandomSelection()
 			tsocket->Receive((void *)&rnd2, sizeof(rnd2));
 
 			size_t sel = (rnd1 + rnd2) % shr_dataset.size();
-			this->topkindex.push_back(sel);
 			if(!shr_dataset[sel].first.empty()) out << shr_dataset[sel].first << endl;
 			shr_dataset.erase(shr_dataset.begin() + sel);
 		}
@@ -1080,7 +1089,6 @@ void Party::RandomSelection()
 			tsocket->Send((void *)&rnd2, sizeof(rnd2));
 
 			size_t sel = (rnd1 + rnd2) % shr_dataset.size();
-			this->topkindex.push_back(sel);
 			if(!shr_dataset[sel].first.empty()) out << shr_dataset[sel].first << endl;
 			shr_dataset.erase(shr_dataset.begin() + sel);
 		}

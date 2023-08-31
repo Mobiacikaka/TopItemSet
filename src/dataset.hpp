@@ -5,6 +5,7 @@
 #include <string>
 #include <bloom.h>
 
+#define logshit std::clog << "shit" << std::endl;
 typedef std::pair<std::string, size_t> KVpair;
 
 class Itemset
@@ -39,6 +40,7 @@ class Dataset
 
 		size_t GetDatasetSize() const;
 		void PrintDataset() const;
+		void PruneDataset(size_t begin);
 		void PruneDataset(std::vector<std::string>);
 };
 
@@ -59,7 +61,7 @@ class KVDataset
 		void PrintKVDataset(std::ostream &out) const;
 		void PrintKVDataset(std::string filename="") const;
 		void SortKVDataset();
-		void EraseFrom(size_t index);
+		void Erase(size_t index);
 };
 
 #endif

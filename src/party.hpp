@@ -66,7 +66,7 @@ private:
 	std::vector<size_t> random_draw_output(double eps_em);
 	void RandomSelection();
 
-	std::vector<size_t> topkindex;
+	/* std::vector<size_t> topkindex; */
 	std::vector<std::string> topkitem;
 	void MakeTopKPublic();
 

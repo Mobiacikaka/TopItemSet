@@ -11,11 +11,23 @@ using namespace std;
 Itemset::Itemset(std::string uncut_str, char del='\t')
 {
 	// https://www.geeksforgeeks.org/how-to-split-a-string-in-cc-python-and-java/
-	stringstream ss(uncut_str);
-	string word;
-	while (!ss.eof()) {
-		getline(ss, word, del);
-		this->data.push_back(word);
+	/* stringstream ss(uncut_str); */
+	/* string word; */
+	/* while (!ss.eof()) { */
+	/* 	getline(ss, word, del); */
+	/* 	this->data.push_back(word); */
+	/* } */
+	size_t begin(0), end(0);
+	while(begin < uncut_str.size())
+	{
+		end = uncut_str.find(del, begin);
+		if(end != std::string::npos)
+			this->data.push_back(uncut_str.substr(begin, end-begin));
+		else {
+			this->data.push_back(uncut_str.substr(begin));
+			break;
+		}
+		begin = end + 1;
 	}
 }
 
@@ -44,7 +56,7 @@ string Itemset::operator[](size_t i) const
 	return this->data[i];
 }
 
-void Itemset::PruneItemset(vector<string> item_remove_exception) 
+void Itemset::PruneItemset(vector<string> item_remove_exception)
 {
 	vector<string> newdata;
 	for(size_t i = 0; i < this->data.size(); i ++) {
@@ -105,7 +117,12 @@ void Dataset::PrintDataset() const
 	}
 }
 
-void Dataset::PruneDataset(vector<string> item_remove_exception) 
+void Dataset::PruneDataset(size_t begin)
+{
+	this->data.erase(this->data.begin() + begin);
+}
+
+void Dataset::PruneDataset(vector<string> item_remove_exception)
 {
 	assert(item_remove_exception.size() > 0);
 	vector<Itemset> newdata;
@@ -204,7 +221,7 @@ void KVDataset::SortKVDataset()
 	);
 }
 
-void KVDataset::EraseFrom(size_t index)
+void KVDataset::Erase(size_t index)
 {
 	this->kvdata.erase(this->kvdata.begin() + index);
 }
