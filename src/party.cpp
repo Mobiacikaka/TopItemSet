@@ -25,7 +25,7 @@ const vector<int> H = {1,2,3,4,5};
 
 
 const size_t prune_times = 3;
-#define MASK 0xFFFF
+#define MASK SIZE_MAX
 
 void Party::set_param(
 	e_role role,
@@ -141,7 +141,7 @@ void Party::CalculateTopKItem(Dataset & original_dataset)
 	clog << "Sort Finished" << endl;
 
 	/* clog << "Selection Start" << endl; */
-	/* this->Selection(); */
+	/* this->Selection("item_select.out"); */
 	/* clog << "Selection Finished" << endl; */
 }
 
@@ -161,7 +161,7 @@ void Party::CalculateTopKItemSet(Dataset & original_dataset)
 	this->kvdataset.GenerateKVDataset(original_dataset, true);
 	this->kvdataset.SortKVDataset();
 	/* this->kvdataset.PrintKVDataset(std::cout); */
-	delta = this->get_delta(kvdataset.GetKVDatasetSize());
+	delta = this->get_delta(original_dataset.GetDatasetSize());
 
 	clog << "Prune Start" << endl;
 	this->Prune();
@@ -179,7 +179,40 @@ void Party::CalculateTopKItemSet(Dataset & original_dataset)
 	clog << "Sort Finished" << endl;
 
 	clog << "Selection Start" << endl;
-	this->Selection();
+	this->Selection("itemset_select.out");
+	/* this->PrintShareDataset("Itemset_Sort.out"); */
+	clog << "Selection Finished" << endl;
+}
+
+void Party::CalculateTopKItemSet_FrequencyEstimate(Dataset & original_dataset)
+{
+	clog << endl << "Running CalculateTopKItemSet" << endl;
+
+	this->MakeTopKPublic();
+	/* for(size_t i = 0; i < this->topkitem.size(); i++) */
+	/* 	cout << this->topkitem[i] << "\t"; cout << endl; */
+	assert(this->topkitem.size());
+	/* original_dataset.PruneDataset(this->topkitem); */
+	this->ConstructCandidateItemSet();
+
+	// Generate KVDataset by frequency estimation
+	this->kvdataset.GenerateKVDataset(original_dataset, this->IS);
+	this->kvdataset.SortKVDataset();
+	/* this->kvdataset.PrintKVDataset(std::cout); */
+	delta = this->get_delta(original_dataset.GetDatasetSize());
+
+	clog << "Merge Start" << endl;
+	this->Merge();
+	this->PrintShareDataset("itemset_merge.out");
+	clog << "Merge Finished" << endl;
+
+	clog << "Sort Start" << endl;
+	this->Sort();
+	this->PrintShareDataset("itemset_sort.out");
+	clog << "Sort Finished" << endl;
+
+	clog << "Selection Start" << endl;
+	this->Selection("itemset_select.out");
 	/* this->PrintShareDataset("Itemset_Sort.out"); */
 	clog << "Selection Finished" << endl;
 }
@@ -190,7 +223,8 @@ void Party::Run()
 	/* original_dataset.PrintDataset(); */
 
 	this->CalculateTopKItem(original_dataset);
-	this->CalculateTopKItemSet(original_dataset);
+	/* this->CalculateTopKItemSet(original_dataset); */
+	this->CalculateTopKItemSet_FrequencyEstimate(original_dataset);
 }
 
 
@@ -1050,10 +1084,9 @@ vector<size_t> Party::random_draw_output(double eps_em)
 	return output;
 }
 
-void Party::RandomSelection()
+void Party::RandomSelection(std::ostream &out)
 {
 	unique_ptr<CSocket> tsocket;
-	ofstream out("Selection.out");
 
 	if(role == SERVER) {
 		tsocket = Listen(address, port);
@@ -1094,17 +1127,25 @@ void Party::RandomSelection()
 		}
 	}
 
-	out.close();
 	tsocket->Close();
 }
 
 
-void Party::Selection()
+void Party::Selection(std::string filename="")
 {
 	double eps1, eps2;
 	double c;
 	double delta_q;
 	double T; // threshold
+
+	ofstream out;
+	if(!filename.empty()) {
+		out.open(filename);
+		if(!out.is_open()) {
+			cerr << filename << " open error." << endl;
+			exit(0);
+		}
+	}
 
 	eps1 = p1 * eps;
 	eps2 = eps - eps1;
@@ -1129,7 +1170,10 @@ void Party::Selection()
 		if(qi_n > T)
 		{
 			shr_dataset.erase(shr_dataset.begin()+i+1, shr_dataset.end());
-			RandomSelection();
+			if(filename.empty())
+				RandomSelection(std::cout);
+			else
+				RandomSelection(out);
 			return;
 		}
 	}
@@ -1152,7 +1196,7 @@ void Party::MakeTopKPublic()
 	unique_ptr<CSocket> tsocket;
 	/* string md5str; */
 	string itemid;
-	size_t idlength;
+	size_t idlength, itemca, itemcb;
 
 	if(this->role == SERVER) {
 		tsocket = Listen(address, port);
@@ -1163,18 +1207,26 @@ void Party::MakeTopKPublic()
 
 		for(size_t i = 0; i < this->shr_dataset.size(); i++) {
 			itemid = this->shr_dataset[i].first;
+			itemca = this->shr_dataset[i].second; // Item Count a
 			if(itemid.empty() == true) {
+				// Receive ID
 				tsocket->Receive((void *)&idlength, sizeof(idlength));
 				itemid.resize(idlength);
 				tsocket->Receive((void *)&itemid[0], idlength);
 			}
 			else {
-				/* itemid = md5map[md5str].first; */
+				// Send ID
 				idlength = itemid.size();
 				tsocket->Send((void *)&idlength, sizeof(idlength));
 				tsocket->Send((void *)itemid.c_str(), itemid.size());
 			}
+			// Send Count
+			tsocket->Send((void *)&itemca, sizeof(itemca));
+			// Receive Count
+			tsocket->Receive((void *)&itemcb, sizeof(itemcb));
+
 			this->topkitem.push_back(itemid);
+			this->topk_item_freq.push_back(make_pair(itemid, itemca + itemcb));
 		}
 	}
 	else {
@@ -1186,18 +1238,26 @@ void Party::MakeTopKPublic()
 
 		for(size_t i = 0; i < this->shr_dataset.size(); i++) {
 			itemid = shr_dataset[i].first;
+			itemcb = this->shr_dataset[i].second;
 			if(itemid.empty() == false) {
-				/* itemid = md5map[md5str].first; */
+				// Send ID
 				idlength = itemid.size();
 				tsocket->Send((void *)&idlength, sizeof(idlength));
 				tsocket->Send((void *)itemid.c_str(), itemid.size());
 			}
 			else {
+				// Receive ID
 				tsocket->Receive((void *)&idlength, sizeof(idlength));
 				itemid.resize(idlength);
 				tsocket->Receive((void *)&itemid[0], idlength);
 			}
+			// Receive Count
+			tsocket->Receive((void *)&itemca, sizeof(itemca));
+			// Send Count
+			tsocket->Send((void *)&itemcb, sizeof(itemcb));
+
 			this->topkitem.push_back(itemid);
+			this->topk_item_freq.push_back(make_pair(itemid, itemca - itemcb));
 		}
 	}
 
@@ -1205,3 +1265,48 @@ void Party::MakeTopKPublic()
 }
 
 
+void Party::ConstructCandidateItemSet()
+{
+	size_t boundsize = static_cast<size_t>(log2(this->topk_item_freq.size()));
+	auto maxitem = max_element(
+			topk_item_freq.begin(),
+			topk_item_freq.end(),
+			[](const KVpair &a, const KVpair &b) {
+				return a.second > b.second;
+			}
+		); // iterator
+
+	sort(
+		this->topk_item_freq.begin(),
+		this->topk_item_freq.end(),
+		[](const KVpair &a, const KVpair &b) {
+			return a.first < b.first;
+		}
+	);
+
+	size_t topklistlength(this->topk_item_freq.size());
+	for(size_t setsize = 2; setsize <= boundsize; setsize ++)
+	{
+		string bitmask(setsize, 1);
+		bitmask.resize(topklistlength);
+		do {
+			vector<string> comb;
+			double freq(1);
+			for(size_t j = 0; j < topklistlength; j ++)
+				if(bitmask[j])
+				{
+					comb.push_back(this->topk_item_freq[j].first);
+					freq *= (0.9 * this->topk_item_freq[j].second) / maxitem->second;
+				}
+			this->IS.push_back(make_pair(comb, freq));
+		} while (prev_permutation(bitmask.begin(), bitmask.end()));
+	}
+
+	sort(this->IS.begin(), this->IS.end(),
+		[](const Set_Freq_pair &a, const Set_Freq_pair &b) {
+			return a.second > b.second;
+		}
+	);
+
+	this->IS.erase(this->IS.begin() + 2 * this->k, this->IS.end());
+}

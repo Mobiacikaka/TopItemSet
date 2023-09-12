@@ -8,7 +8,7 @@
 #include <bits/stdc++.h>
 using namespace std;
 
-Itemset::Itemset(std::string uncut_str, char del='\t')
+Itemset::Itemset(std::string uncut_str, char del=' ')
 {
 	// https://www.geeksforgeeks.org/how-to-split-a-string-in-cc-python-and-java/
 	/* stringstream ss(uncut_str); */
@@ -29,6 +29,9 @@ Itemset::Itemset(std::string uncut_str, char del='\t')
 		}
 		begin = end + 1;
 	}
+
+	// data always sorted
+	sort(this->data.begin(), this->data.end());
 }
 
 Itemset::Itemset(std::vector<std::string> cut_str)
@@ -73,22 +76,29 @@ void Itemset::PruneItemset(vector<string> item_remove_exception)
 
 string Itemset::ConcatWithOrder() const
 {
+	// assert this->data is ordered
 	string concatstr;
-	vector<string> sorted(this->data);
-	sort(sorted.begin(), sorted.end());
-	for(size_t i = 0; i < sorted.size(); i++)
-		concatstr = concatstr + sorted[i] + ",";
+	for(size_t i = 0; i < this->data.size(); i++)
+		concatstr = concatstr + this->data[i] + ",";
 	return concatstr;
+}
+
+bool Itemset::include(std::vector<std::string> &smallset) const
+{
+	// data and smallset must be sorted
+	return includes(
+			this->data.begin(),
+			this->data.end(),
+			smallset.begin(),
+			smallset.end()
+		);
 }
 
 Dataset::Dataset()
 {
-	size_t num_users;
-	cin >> num_users;
-	for(size_t i = 0; i < num_users; i ++)
+	string uncut_itemset_str;
+	while(getline(cin, uncut_itemset_str, '\n'))
 	{
-		string uncut_itemset_str;
-		getline(cin, uncut_itemset_str, '\n');
 		Itemset itemset(uncut_itemset_str);
 		this->data.push_back(itemset);
 	}
@@ -132,6 +142,17 @@ void Dataset::PruneDataset(vector<string> item_remove_exception)
 	}
 	this->data = newdata;
 	return;
+}
+
+size_t Dataset::CountSubset(std::vector<std::string> &smallset) const
+{
+	size_t count(0);
+	for(size_t i = 0; i < this->data.size(); i++)
+	{
+		if(this->data[i].include(smallset))
+			count ++;
+	}
+	return count;
 }
 
 // BloomFilter
@@ -190,6 +211,18 @@ void KVDataset::GenerateKVDataset(Dataset &original_dataset, bool)
 			return p;
 		}
 	);
+}
+
+void KVDataset::GenerateKVDataset(Dataset &original_dataset, std::vector<Set_Freq_pair> &IS)
+{
+	this->kvdata.clear();
+	for(size_t i = 0; i < IS.size(); i ++)
+	{
+		Itemset candidate_itemset(IS[i].first);
+		string candidate_concat_str = candidate_itemset.ConcatWithOrder();
+		size_t count = original_dataset.CountSubset(IS[i].first);
+		this->kvdata.push_back(make_pair(candidate_concat_str, count));
+	}
 }
 
 size_t KVDataset::GetKVDatasetSize() const

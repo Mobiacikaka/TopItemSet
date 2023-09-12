@@ -7,6 +7,7 @@
 
 #define logshit std::clog << "shit" << std::endl;
 typedef std::pair<std::string, size_t> KVpair;
+typedef std::pair<std::vector<std::string>, double> Set_Freq_pair;
 
 class Itemset
 {
@@ -24,6 +25,8 @@ class Itemset
 
 		void PruneItemset(std::vector<std::string>) ;
 		std::string ConcatWithOrder() const;
+
+		bool include(std::vector<std::string> &smallset) const;
 };
 
 class Dataset
@@ -42,6 +45,8 @@ class Dataset
 		void PrintDataset() const;
 		void PruneDataset(size_t begin);
 		void PruneDataset(std::vector<std::string>);
+
+		size_t CountSubset(std::vector<std::string> &smallset) const;
 };
 
 class KVDataset
@@ -57,6 +62,7 @@ class KVDataset
 
 		void GenerateKVDataset(Dataset &original_dataset);
 		void GenerateKVDataset(Dataset &original_dataset, bool);
+		void GenerateKVDataset(Dataset &original_dataset, std::vector<Set_Freq_pair> &IS);
 		size_t GetKVDatasetSize() const;
 		void PrintKVDataset(std::ostream &out) const;
 		void PrintKVDataset(std::string filename="") const;
