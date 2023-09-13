@@ -1,12 +1,22 @@
 #!/bin/python3
 import os
+import subprocess as sp
 from src.gm import generate_key
 
-dataset = 'gowalla'
+root_dir = os.getcwd()
 
 def build_topitemset():
 	os.system('mkdir -p build')
-	os.system('cd build && cmake .. && make -j$(nproc)')
+	a = os.system('cd build && cmake .. && make clean && make')
+	if a != 0:
+		print("[run.py] Build Error!")
+		exit()
+
+def set_global(dataset: str):
+	global binary, srv_data, cli_data
+	binary = f'{root_dir}/build/topitemset'
+	srv_data = f'{root_dir}/datasets/{dataset}/server.txt'
+	cli_data = f'{root_dir}/datasets/{dataset}/client.txt'
 
 def copy_file(folder_name):
 	os.system(f'cp ./build/topitemset {dataset}/topitemset')
@@ -23,20 +33,18 @@ def copy_file(folder_name):
 	os.system(f'touch ./{folder_name}/server/Selection.out')
 	os.system(f'touch ./{folder_name}/client/Selection.out')
 
-def copy_key(folder_name):
-	def print_key():
-		f = open('key.txt', 'w')
-		key_A = generate_key()
-		n, y = key_A['pub']
-		p, q = key_A['priv']
-		f.write(str(int(n)) + '\n')
-		f.write(str(int(y)) + '\n')
-		f.write(str(int(p)) + '\n')
-		f.write(str(int(q)) + '\n')
-		f.close()
-
-	print_key()
-	os.system(f'mv key.txt {folder_name}/server/')
+def genkey():
+	global keyfile
+	keyfile = f'{root_dir}/key.txt'
+	f = open(keyfile, 'w')
+	key_A = generate_key()
+	n, y = key_A['pub']
+	p, q = key_A['priv']
+	f.write(str(int(n)) + '\n')
+	f.write(str(int(y)) + '\n')
+	f.write(str(int(p)) + '\n')
+	f.write(str(int(q)) + '\n')
+	f.close()
 
 def run_topitemset(folder_name, eps, k, kbar, mu):
 	os.system(f'cd ./{folder_name}/server && ./topitemset -2 {eps} -k {k} -1 {kbar} -m {mu} -r 0 >/dev/null 2>&1 &')
@@ -101,12 +109,29 @@ def one_run(eps, k, kbar, mu, times):
 	run_topitemset(folder_name, eps, k, kbar, mu)
 	return cal_metric(folder_name, k)
 
+def mkdir(foldername: str):
+	flag = os.system(f'mkdir \"{foldername}\"')
+	if flag == 256:
+		print('Folder exist, please choose another name')
+		exit()
+	assert(flag == 0)
+
+def cp(src: str, des: str):
+	os.system(f'cp {src} {des}')
+
 if __name__ == '__main__':
+	dataset = 'kosarak'
 	eps_list = [1.0]
 	k_list = [20]
 	mu_list = list(range(1, 11))
 	mu_list = [float(mu)/10 for mu in mu_list]
+	mu_list = [0.9]
 	kbar_list = [20]
+	run_times = 10
+	results_folder_name = input('Type the folder name the result located in: ')
+
+	results_folder_name = f'{root_dir}/datasets/{dataset}/{results_folder_name}'
+	mkdir(results_folder_name)
 
 	args = [
 		(eps, k, kbar, mu)
@@ -116,21 +141,44 @@ if __name__ == '__main__':
 		for mu in mu_list
 	]
 
-	os.system(f'mkdir -p {dataset}')
 	build_topitemset()
+	genkey()
+	set_global(dataset)
 
 	for arg in args:
 		eps, k, kbar, mu = arg
-		ji_list = []
-		ncr_list = []
-		run_times = 10
-		print(f'eps: {eps}, k: {k}, kbar: {kbar}, mu: {mu}, times: {run_times}')
+		print(f'Running args - eps: {eps}, k: {k}, kbar: {kbar}, mu: {mu}, times: {run_times}')
+
+		def runcommand(role=0):
+			datafile = srv_data
+			if role == 1:
+				datafile = cli_data
+			command = f'cat {datafile} | {binary} -k {k} -1 {kbar} -2 {eps} -m {mu} -r {role}'
+			return command
+
 		for times in range(run_times):
-			ji, ncr = one_run(eps, k, kbar, mu, times)
-			remove_files(eps, k, kbar, mu, times)
-			ji_list.append(ji)
-			ncr_list.append(ncr)
-		print(f'avg_ji: {sum(ji_list)/run_times:.3f}, avg_ncr: {sum(ncr_list)/run_times:.3f}')
+			result_folder_name = f'{results_folder_name}/eps_{eps}_k_{k}_kbar_{kbar}_mu_{mu}_times_{times}'
+			mkdir(result_folder_name)
+			mkdir(f'{result_folder_name}/server')
+			cp(keyfile, f'{result_folder_name}/server')
+			mkdir(f'{result_folder_name}/client')
+			sp.Popen(runcommand(0), cwd=f'{result_folder_name}/server', shell=True, stdout=sp.PIPE)
+			sp.run(runcommand(1), cwd=f'{result_folder_name}/client', shell=True, stdout=sp.PIPE)
 
-	os.system(f'mv eps_* {dataset}')
+	# os.system(f'mkdir -p {dataset}')
+	# build_topitemset()
 
+	# for arg in args:
+	# 	eps, k, kbar, mu = arg
+	# 	ji_list = []
+	# 	ncr_list = []
+	# 	run_times = 10
+	# 	print(f'eps: {eps}, k: {k}, kbar: {kbar}, mu: {mu}, times: {run_times}')
+	# 	for times in range(run_times):
+	# 		ji, ncr = one_run(eps, k, kbar, mu, times)
+	# 		remove_files(eps, k, kbar, mu, times)
+	# 		ji_list.append(ji)
+	# 		ncr_list.append(ncr)
+	# 	print(f'avg_ji: {sum(ji_list)/run_times:.3f}, avg_ncr: {sum(ncr_list)/run_times:.3f}')
+
+	# os.system(f'mv eps_* {dataset}')
