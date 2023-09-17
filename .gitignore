@@ -33,3 +33,4 @@
 
 build
 datasets
+src/__pycache__
