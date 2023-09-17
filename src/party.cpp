@@ -53,10 +53,15 @@ void Party::set_param(
 
 	this->k = k;
 	this->kbar = kbar >= k ? kbar : k;
-	this->eps = eps;
+	// WARNING
+	// the input eps is a sum for item and itemset mining
+	// two operations share a same amount of privacy consumption
+	this->eps = eps / 2;
 	this->p1 = p1;
 	this->eps_em = eps_em;
 	this->mu = mu;
+
+	this->comparetimes = 0;
 }
 
 void Party::PrintShareDataset(std::ostream &out)
@@ -122,9 +127,6 @@ void Party::CalculateTopKItem(Dataset & original_dataset)
 	this->kvdataset.GenerateKVDataset(original_dataset);
 	this->kvdataset.SortKVDataset();
 
-	// FIXME what size should be set
-	delta = this->get_delta(this->kvdataset.GetKVDatasetSize());
-
 	clog << "Prune Start" << endl;
 	this->Prune();
 	this->kvdataset.PrintKVDataset("item_prune.out");
@@ -139,10 +141,6 @@ void Party::CalculateTopKItem(Dataset & original_dataset)
 	this->Sort();
 	this->PrintShareDataset("item_sort.out");
 	clog << "Sort Finished" << endl;
-
-	/* clog << "Selection Start" << endl; */
-	/* this->Selection("item_select.out"); */
-	/* clog << "Selection Finished" << endl; */
 }
 
 void Party::CalculateTopKItemSet(Dataset & original_dataset)
@@ -180,7 +178,6 @@ void Party::CalculateTopKItemSet(Dataset & original_dataset)
 
 	clog << "Selection Start" << endl;
 	this->Selection("itemset_select.out");
-	/* this->PrintShareDataset("Itemset_Sort.out"); */
 	clog << "Selection Finished" << endl;
 }
 
@@ -189,8 +186,6 @@ void Party::CalculateTopKItemSet_FrequencyEstimate(Dataset & original_dataset)
 	clog << endl << "Running CalculateTopKItemSet" << endl;
 
 	this->MakeTopKPublic();
-	/* for(size_t i = 0; i < this->topkitem.size(); i++) */
-	/* 	cout << this->topkitem[i] << "\t"; cout << endl; */
 	assert(this->topkitem.size());
 	/* original_dataset.PruneDataset(this->topkitem); */
 	this->ConstructCandidateItemSet();
@@ -198,7 +193,6 @@ void Party::CalculateTopKItemSet_FrequencyEstimate(Dataset & original_dataset)
 	// Generate KVDataset by frequency estimation
 	this->kvdataset.GenerateKVDataset(original_dataset, this->IS);
 	this->kvdataset.SortKVDataset();
-	/* this->kvdataset.PrintKVDataset(std::cout); */
 	delta = this->get_delta(original_dataset.GetDatasetSize());
 
 	clog << "Merge Start" << endl;
@@ -213,7 +207,6 @@ void Party::CalculateTopKItemSet_FrequencyEstimate(Dataset & original_dataset)
 
 	clog << "Selection Start" << endl;
 	this->Selection("itemset_select.out");
-	/* this->PrintShareDataset("Itemset_Sort.out"); */
 	clog << "Selection Finished" << endl;
 }
 
@@ -576,6 +569,8 @@ void Party::Merge()
 // non-Secure compare
 bool Party::compare(KVpair & kv1, KVpair & kv2)
 {
+	this->comparetimes ++;
+
 	unique_ptr<CSocket> tsocket;
 	bool flag(false);
 	if(role == SERVER) {
@@ -616,6 +611,8 @@ bool Party::compare(KVpair & kv1, KVpair & kv2)
 // Secure compare
 bool Party::compare(KVpair & kv1, KVpair & kv2, int)
 {
+	this->comparetimes ++;
+
 	ABYParty * party = new ABYParty(role, address, port, seclevel, bitlen, nthreads, mt_alg);
 	vector<Sharing*> sharings = party->GetSharings();
 	BooleanCircuit * circ = (BooleanCircuit*) sharings[S_BOOL]->GetCircuitBuildRoutine();
@@ -1161,6 +1158,7 @@ void Party::Selection(std::string filename="")
 	clog << "delta\t" << delta << endl;
 	clog << "delta_q\t" << delta_q << endl;
 	clog << "thresh\t" << T << endl;
+	clog << "compare times\t" << this->comparetimes << endl;
 
 	double qi_n;
 	for(int i = kbar - 1; i >= 0; i --)
@@ -1226,7 +1224,7 @@ void Party::MakeTopKPublic()
 			tsocket->Receive((void *)&itemcb, sizeof(itemcb));
 
 			this->topkitem.push_back(itemid);
-			this->topk_item_freq.push_back(make_pair(itemid, itemca + itemcb));
+			this->topk_item_freq.push_back(make_pair(itemid, itemca - itemcb));
 		}
 	}
 	else {
@@ -1268,13 +1266,10 @@ void Party::MakeTopKPublic()
 void Party::ConstructCandidateItemSet()
 {
 	size_t boundsize = static_cast<size_t>(log2(this->topk_item_freq.size()));
-	auto maxitem = max_element(
-			topk_item_freq.begin(),
-			topk_item_freq.end(),
-			[](const KVpair &a, const KVpair &b) {
-				return a.second > b.second;
-			}
-		); // iterator
+	size_t maxfreq = 0;
+	for(size_t i = 0; i < this->topk_item_freq.size(); i++)
+		if(this->topk_item_freq[i].second > maxfreq)
+			maxfreq = this->topk_item_freq[i].second;
 
 	sort(
 		this->topk_item_freq.begin(),
@@ -1285,7 +1280,7 @@ void Party::ConstructCandidateItemSet()
 	);
 
 	size_t topklistlength(this->topk_item_freq.size());
-	for(size_t setsize = 2; setsize <= boundsize; setsize ++)
+	for(size_t setsize = 1; setsize <= boundsize; setsize ++)
 	{
 		string bitmask(setsize, 1);
 		bitmask.resize(topklistlength);
@@ -1296,7 +1291,7 @@ void Party::ConstructCandidateItemSet()
 				if(bitmask[j])
 				{
 					comb.push_back(this->topk_item_freq[j].first);
-					freq *= (0.9 * this->topk_item_freq[j].second) / maxitem->second;
+					freq *= (0.9 * this->topk_item_freq[j].second) / maxfreq;
 				}
 			this->IS.push_back(make_pair(comb, freq));
 		} while (prev_permutation(bitmask.begin(), bitmask.end()));
@@ -1309,4 +1304,12 @@ void Party::ConstructCandidateItemSet()
 	);
 
 	this->IS.erase(this->IS.begin() + 2 * this->k, this->IS.end());
+
+	for(size_t i = 0; i < this->IS.size(); i ++) {
+		cout << this->IS[i].second << ":\t";
+		auto &comb(this->IS[i].first);
+		for(size_t j = 0; j < comb.size(); j ++)
+			cout << comb[j] << "\t";
+		cout << endl;
+	}
 }

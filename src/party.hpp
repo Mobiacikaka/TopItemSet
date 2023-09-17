@@ -50,6 +50,7 @@ private:
 	int MakeShareSrv(size_t & index, CSocket * tsocket);
 	int MakeShareCli(CSocket * tsocket);
 
+	size_t comparetimes;
 	bool compare(KVpair & kv1, KVpair & kv2);
 	bool compare(KVpair & kv1, KVpair & kv2, int);
 
