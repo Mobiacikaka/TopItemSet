@@ -124,23 +124,29 @@ void Party::CalculateTopKItem(Dataset & original_dataset)
 {
 	clog << "Running CalculateTopKItem" << endl;
 
+	delta = this->get_delta(original_dataset.GetDatasetSize());
 	this->kvdataset.GenerateKVDataset(original_dataset);
 	this->kvdataset.SortKVDataset();
 
 	clog << "Prune Start" << endl;
 	this->Prune();
-	this->kvdataset.PrintKVDataset("item_prune.out");
+	this->kvdataset.PrintKVDataset("item_0_prune.out");
 	clog << "Prune Finished" << endl;
 
 	clog << "Merge Start" << endl;
 	this->Merge();
-	this->PrintShareDataset("item_merge.out");
+	this->PrintShareDataset("item_1_merge.out");
 	clog << "Merge Finished" << endl;
 
 	clog << "Sort Start" << endl;
 	this->Sort();
-	this->PrintShareDataset("item_sort.out");
+	this->PrintShareDataset("item_2_sort.out");
 	clog << "Sort Finished" << endl;
+
+	clog << "Selection Start" << endl;
+	this->Selection();
+	this->PrintShareDataset("item_3_select.out");
+	clog << "Selection Finished" << endl;
 }
 
 void Party::CalculateTopKItemSet(Dataset & original_dataset)
@@ -163,21 +169,22 @@ void Party::CalculateTopKItemSet(Dataset & original_dataset)
 
 	clog << "Prune Start" << endl;
 	this->Prune();
-	this->kvdataset.PrintKVDataset("itemset_prune.out");
+	this->kvdataset.PrintKVDataset("itemset_0_prune.out");
 	clog << "Prune Finished" << endl;
 
 	clog << "Merge Start" << endl;
 	this->Merge();
-	this->PrintShareDataset("itemset_merge.out");
+	this->PrintShareDataset("itemset_1_merge.out");
 	clog << "Merge Finished" << endl;
 
 	clog << "Sort Start" << endl;
 	this->Sort();
-	this->PrintShareDataset("itemset_sort.out");
+	this->PrintShareDataset("itemset_2_sort.out");
 	clog << "Sort Finished" << endl;
 
 	clog << "Selection Start" << endl;
-	this->Selection("itemset_select.out");
+	this->Selection();
+	this->PrintShareDataset("itemset_3_select.out");
 	clog << "Selection Finished" << endl;
 }
 
@@ -197,16 +204,17 @@ void Party::CalculateTopKItemSet_FrequencyEstimate(Dataset & original_dataset)
 
 	clog << "Merge Start" << endl;
 	this->Merge();
-	this->PrintShareDataset("itemset_merge.out");
+	this->PrintShareDataset("itemset_0_merge.out");
 	clog << "Merge Finished" << endl;
 
 	clog << "Sort Start" << endl;
 	this->Sort();
-	this->PrintShareDataset("itemset_sort.out");
+	this->PrintShareDataset("itemset_1_sort.out");
 	clog << "Sort Finished" << endl;
 
 	clog << "Selection Start" << endl;
-	this->Selection("itemset_select.out");
+	this->Selection();
+	this->PrintShareDataset("itemset_2_select.out");
 	clog << "Selection Finished" << endl;
 }
 
@@ -1081,7 +1089,7 @@ vector<size_t> Party::random_draw_output(double eps_em)
 	return output;
 }
 
-void Party::RandomSelection(std::ostream &out)
+void Party::RandomSelection()
 {
 	unique_ptr<CSocket> tsocket;
 
@@ -1100,7 +1108,6 @@ void Party::RandomSelection(std::ostream &out)
 			tsocket->Receive((void *)&rnd2, sizeof(rnd2));
 
 			size_t sel = (rnd1 + rnd2) % shr_dataset.size();
-			if(!shr_dataset[sel].first.empty()) out << shr_dataset[sel].first << endl;
 			shr_dataset.erase(shr_dataset.begin() + sel);
 		}
 	}
@@ -1119,7 +1126,6 @@ void Party::RandomSelection(std::ostream &out)
 			tsocket->Send((void *)&rnd2, sizeof(rnd2));
 
 			size_t sel = (rnd1 + rnd2) % shr_dataset.size();
-			if(!shr_dataset[sel].first.empty()) out << shr_dataset[sel].first << endl;
 			shr_dataset.erase(shr_dataset.begin() + sel);
 		}
 	}
@@ -1128,21 +1134,12 @@ void Party::RandomSelection(std::ostream &out)
 }
 
 
-void Party::Selection(std::string filename="")
+void Party::Selection()
 {
 	double eps1, eps2;
 	double c;
 	double delta_q;
 	double T; // threshold
-
-	ofstream out;
-	if(!filename.empty()) {
-		out.open(filename);
-		if(!out.is_open()) {
-			cerr << filename << " open error." << endl;
-			exit(0);
-		}
-	}
 
 	eps1 = p1 * eps;
 	eps2 = eps - eps1;
@@ -1168,10 +1165,7 @@ void Party::Selection(std::string filename="")
 		if(qi_n > T)
 		{
 			shr_dataset.erase(shr_dataset.begin()+i+1, shr_dataset.end());
-			if(filename.empty())
-				RandomSelection(std::cout);
-			else
-				RandomSelection(out);
+			/* RandomSelection(); */
 			return;
 		}
 	}

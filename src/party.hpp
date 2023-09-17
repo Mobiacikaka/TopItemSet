@@ -65,7 +65,7 @@ private:
 	double generate_R(double mass);
 	uint64_t RandomDraw(double mass);
 	std::vector<size_t> random_draw_output(double eps_em);
-	void RandomSelection(std::ostream &out);
+	void RandomSelection();
 
 	/* std::vector<size_t> topkindex; */
 	std::vector<std::string> topkitem;
@@ -97,8 +97,7 @@ protected:
 	void Prune();
 	void Merge();
 	void Sort();
-	// std::vector<size_t> Selection( const size_t k, const size_t kbar, const double epsilon, const double p1, const double eps_em, const double delta);
-	void Selection(std::string filename);
+	void Selection();
 
 public:
 	Party() {}
