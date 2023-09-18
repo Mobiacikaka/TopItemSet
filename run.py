@@ -1,7 +1,6 @@
 #!/bin/python3
-import os
+import os, subprocess, multiprocessing, socket, errno
 from os.path import isdir
-import subprocess as sp
 from src.gm import generate_key
 
 root_dir = os.getcwd()
@@ -14,10 +13,11 @@ def build_topitemset():
 		exit()
 
 def set_global(dataset: str):
-	global binary, srv_data, cli_data
+	global binary, srv_data, cli_data, port_list
 	binary = f'{root_dir}/build/topitemset'
 	srv_data = f'{root_dir}/datasets/{dataset}/server.txt'
 	cli_data = f'{root_dir}/datasets/{dataset}/client.txt'
+	port_list = []
 
 def genkey():
 	global keyfile
@@ -42,13 +42,51 @@ def mkdir(foldername: str):
 def cp(src: str, des: str):
 	os.system(f'cp {src} {des}')
 
-if __name__ == '__main__':
+def onerun(eps, k, kbar, mu, times, results_folder_name):
+	print(f'Running args - eps: {eps}, k: {k}, kbar: {kbar}, mu: {mu}, times: {times}')
+	result_folder_name = f'{results_folder_name}/eps_{eps}_k_{k}_kbar_{kbar}_mu_{mu}'
+	times_folder_name = f'{result_folder_name}/{times}'
+	mkdir(times_folder_name)
+	mkdir(f'{times_folder_name}/server')
+	mkdir(f'{times_folder_name}/client')
+	cp(keyfile, f'{times_folder_name}/server')
+
+	def runcommand(role: int=0):
+		assert(role == 0 or role == 1)
+		if role == 0:
+			datafile = srv_data
+		else:
+			datafile = cli_data
+		command = f'cat {datafile} | {binary} -p {port} -k {k} -1 {kbar} -2 {eps} -m {mu} -r {role} > log.out 2>&1'
+		return command
+
+	def checkportfree(port: int):
+		try:
+			s.connect(('localhost', port))
+			s.shutdown(2)
+			return False
+		except:
+			return True
+
+	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	base_port = 2**15
+	port = base_port + times
+	while (not checkportfree(port)) or port in port_list:
+		assert(0)
+	port_list.append(port)
+
+	subprocess.Popen(runcommand(0),	cwd=f'{times_folder_name}/server', shell=True, stdout=subprocess.PIPE)
+	subprocess.run(runcommand(1),	cwd=f'{times_folder_name}/client', shell=True, stdout=subprocess.PIPE)
+
+	port_list.remove(port)
+
+def main():
 	dataset = 'kosarak'
 	eps_list = [2.0]
-	k_list = [64]
+	k_list = list(range(8, 128, 8))
 	mu_list = [0.9]
 	kbar_list = [64]
-	run_times = 1
+	run_times = 10
 
 	results_folder_name = input('Type the folder name the result located in: ')
 	results_folder_name = f'{root_dir}/datasets/{dataset}/{results_folder_name}'
@@ -73,7 +111,10 @@ if __name__ == '__main__':
 
 	for arg in args:
 		eps, k, kbar, mu = arg
+		kbar = k
 		print(f'Running args - eps: {eps}, k: {k}, kbar: {kbar}, mu: {mu}, times: {run_times}')
+		result_folder_name = f'{results_folder_name}/eps_{eps}_k_{k}_kbar_{kbar}_mu_{mu}'
+		mkdir(result_folder_name)
 
 		def runcommand(role=0):
 			datafile = srv_data
@@ -83,10 +124,62 @@ if __name__ == '__main__':
 			return command
 
 		for times in range(run_times):
-			result_folder_name = f'{results_folder_name}/eps_{eps}_k_{k}_kbar_{kbar}_mu_{mu}_times_{times}'
+			times_folder = f'{result_folder_name}/{times}'
+			mkdir(times_folder)
+			mkdir(f'{times_folder}/server')
+			mkdir(f'{times_folder}/client')
+			cp(keyfile, f'{times_folder}/server')
+			subprocess.Popen(runcommand(0),	cwd=f'{times_folder}/server', shell=True, stdout=subprocess.PIPE)
+			subprocess.run(runcommand(1),	cwd=f'{times_folder}/client', shell=True, stdout=subprocess.PIPE)
+
+def main_multi():
+	dataset		= 'kosarak'
+	eps_list	= [2.0]
+	k_list		= [16]
+	mu_list		= [0.9]
+	kbar_list	= [16]
+	run_times	= 10
+
+	results_folder_name = input('Type the folder name the result located in: ')
+	results_folder_name = f'{root_dir}/datasets/{dataset}/{results_folder_name}'
+	if os.path.isdir(results_folder_name):
+		flag = input('Folder exists, override? y or n: ') or 'n'
+		assert(flag == 'y' or flag == 'n')
+		if flag == 'y':
+			os.system(f'rm -rf {results_folder_name}')
+	mkdir(results_folder_name)
+
+	args = [
+		(
+			eps,
+			k,
+			kbar,
+			mu,
+			times,
+			results_folder_name,
+		)
+		for eps	in eps_list
+		for k	in k_list
+		for mu	in mu_list
+		for kbar in kbar_list
+		for times in range(run_times)
+	]
+
+	build_topitemset()
+	genkey()
+	set_global(dataset)
+
+	for arg in args:
+		eps, k, kbar, mu, _, _ = arg
+		result_folder_name = f'{results_folder_name}/eps_{eps}_k_{k}_kbar_{kbar}_mu_{mu}'
+		if not os.path.isdir(result_folder_name):
 			mkdir(result_folder_name)
-			mkdir(f'{result_folder_name}/server')
-			cp(keyfile, f'{result_folder_name}/server')
-			mkdir(f'{result_folder_name}/client')
-			sp.Popen(runcommand(0), cwd=f'{result_folder_name}/server', shell=True, stdout=sp.PIPE)
-			sp.run(runcommand(1), cwd=f'{result_folder_name}/client', shell=True, stdout=sp.PIPE)
+
+	server_count = multiprocessing.cpu_count() // 3
+	pool = multiprocessing.Pool(server_count)
+	pool.starmap(onerun, args)
+	pool.close()
+	pool.join()
+
+if __name__ == '__main__':
+	main_multi()
