@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <algorithm>
+#include <queue>
 #include <random>
 #include <cmath>
 #include <iostream>
@@ -1260,11 +1261,13 @@ void Party::MakeTopKPublic()
 void Party::ConstructCandidateItemSet()
 {
 	size_t boundsize = static_cast<size_t>(log2(this->topk_item_freq.size()));
+
 	size_t maxfreq = 0;
 	for(size_t i = 0; i < this->topk_item_freq.size(); i++)
 		if(this->topk_item_freq[i].second > maxfreq)
 			maxfreq = this->topk_item_freq[i].second;
 
+	// sort by the dictionary order
 	sort(
 		this->topk_item_freq.begin(),
 		this->topk_item_freq.end(),
@@ -1274,36 +1277,51 @@ void Party::ConstructCandidateItemSet()
 	);
 
 	size_t topklistlength(this->topk_item_freq.size());
+	size_t queuesize = pow(2, ceil(log2(2 * this->k)));
+	/* size_t queuesize = this->k^2; */
+	priority_queue<Set_Freq_pair, vector<Set_Freq_pair>, Comparator> IS_invert;
+
 	for(size_t setsize = 1; setsize <= boundsize; setsize ++)
 	{
+		bool levelflag(false);
+
 		string bitmask(setsize, 1);
 		bitmask.resize(topklistlength);
 		do {
 			vector<string> comb;
-			double freq(1);
+			double freq(-1.0);
 			for(size_t j = 0; j < topklistlength; j ++)
+			{
 				if(bitmask[j])
 				{
 					comb.push_back(this->topk_item_freq[j].first);
 					freq *= (0.9 * this->topk_item_freq[j].second) / maxfreq;
 				}
-			this->IS.push_back(make_pair(comb, freq));
+			}
+			if(IS_invert.size() <= queuesize) {
+				IS_invert.push(make_pair(comb, freq));
+				levelflag = true;
+			}
+			else {
+				if(IS_invert.top().second >= freq) {
+					if(IS_invert.top().second != freq) IS_invert.pop();
+					IS_invert.push(make_pair(comb, freq));
+					levelflag = true;
+				}
+			}
 		} while (prev_permutation(bitmask.begin(), bitmask.end()));
+
+		if(!levelflag) break;
 	}
 
-	sort(this->IS.begin(), this->IS.end(),
-		[](const Set_Freq_pair &a, const Set_Freq_pair &b) {
-			return a.second > b.second;
-		}
-	);
-
-	this->IS.erase(this->IS.begin() + 2 * this->k, this->IS.end());
-
-	for(size_t i = 0; i < this->IS.size(); i ++) {
-		cout << this->IS[i].second << ":\t";
-		auto &comb(this->IS[i].first);
-		for(size_t j = 0; j < comb.size(); j ++)
-			cout << comb[j] << "\t";
-		cout << endl;
+	// select the most frequent top 2*k
+	while(!IS_invert.empty()) {
+		auto &top(IS_invert.top());
+		this->IS.push_back(make_pair(top.first, top.second * -1));
+		IS_invert.pop();
 	}
+
+	reverse(this->IS.begin(), this->IS.end());
+	if(this->IS.size() > 2 * this->k)
+		this->IS.erase(this->IS.begin() + 2 * this->k, this->IS.end());
 }

@@ -9,6 +9,12 @@
 typedef std::pair<std::string, size_t> KVpair;
 typedef std::pair<std::vector<std::string>, double> Set_Freq_pair;
 
+class Comparator {
+	public:
+		bool operator()(const KVpair &a, const KVpair &b) { return a.second < b.second; }
+		bool operator()(const Set_Freq_pair &a, const Set_Freq_pair &b) { return a.second < b.second; }
+};
+
 class Itemset
 {
 	protected:
