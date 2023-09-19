@@ -35,6 +35,7 @@ private:
 		e_mt_gen_alg mt_alg;
 	};
 	std::string address;
+	std::shared_ptr<CSocket> tsocket;
 
 	size_t k;
 	size_t kbar;
@@ -47,8 +48,8 @@ private:
 	std::vector<std::string> md5set;
 	std::map<std::string, KVpair> md5map;
 	void makeMD5set();
-	int MakeShareSrv(size_t & index, CSocket * tsocket);
-	int MakeShareCli(CSocket * tsocket);
+	int MakeShareSrv(size_t & index);
+	int MakeShareCli();
 
 	size_t comparetimes;
 	bool compare(KVpair & kv1, KVpair & kv2);
@@ -79,8 +80,8 @@ private:
 	uint64_t decrypt_bit(uint64_t bit, struct Key &key);
 	int64_t jacobi(uint64_t bitc, uint64_t p);
 	uint64_t power(uint64_t x, uint64_t y, uint64_t p);
-	uint64_t get_sizeof_interset_server(std::unique_ptr<CSocket> &, struct Key &, size_t);
-	uint64_t get_sizeof_interset_client(std::unique_ptr<CSocket> &, struct Key &, size_t);
+	uint64_t get_sizeof_interset_server(struct Key &, size_t);
+	uint64_t get_sizeof_interset_client(struct Key &, size_t);
 
 	size_t __partition(size_t low, size_t high);
 	size_t __select_pivot(size_t low, size_t high);

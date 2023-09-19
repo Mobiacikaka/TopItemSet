@@ -89,35 +89,21 @@ void Party::PrintShareDataset(std::string filename="")
 
 double Party::get_delta(size_t nr_users)
 {
-	unique_ptr<CSocket> tsocket;
 	double delta;
 
 	if(role == SERVER) {
-		tsocket = Listen(address, port);
-		if(!tsocket) {
-			cerr << "Listen Failed!" << endl;
-			exit(1);
-		}
-
 		size_t nr_users_cli;
-		tsocket->Send((void *)&nr_users, sizeof(nr_users));
-		tsocket->Receive((void *)&nr_users_cli, sizeof(nr_users));
+		this->tsocket->Send((void *)&nr_users, sizeof(nr_users));
+		this->tsocket->Receive((void *)&nr_users_cli, sizeof(nr_users));
 		delta = 2.0 / (nr_users + nr_users_cli);
 	}
 	else {
-		tsocket = Connect(address, port);
-		if(!tsocket) {
-			cerr << "Connect Failed!" << endl;
-			exit(1);
-		}
-
 		size_t nr_users_srv;
-		tsocket->Receive((void *)&nr_users_srv, sizeof(nr_users_srv));
-		tsocket->Send((void *)&nr_users, sizeof(nr_users));
+		this->tsocket->Receive((void *)&nr_users_srv, sizeof(nr_users_srv));
+		this->tsocket->Send((void *)&nr_users, sizeof(nr_users));
 		delta = 2.0 / (nr_users + nr_users_srv);
 	}
 
-	tsocket->Close();
 	return delta;
 }
 
@@ -222,11 +208,21 @@ void Party::CalculateTopKItemSet_FrequencyEstimate(Dataset & original_dataset)
 void Party::Run()
 {
 	Dataset original_dataset;
-	/* original_dataset.PrintDataset(); */
+
+	if(this->role == SERVER)
+		this->tsocket = Listen(this->address, this->port);
+	else
+		this->tsocket = Connect(this->address, this->port);
+	if(!tsocket)
+	{
+		cerr << "Port connection failed!" << endl;
+		exit(-1);
+	}
 
 	this->CalculateTopKItem(original_dataset);
-	/* this->CalculateTopKItemSet(original_dataset); */
 	this->CalculateTopKItemSet_FrequencyEstimate(original_dataset);
+
+	this->tsocket->Close();
 }
 
 
@@ -317,7 +313,7 @@ uint64_t Party::decrypt_bit(uint64_t bitc, struct Key &key) {
 }
 
 
-uint64_t Party::get_sizeof_interset_server(std::unique_ptr<CSocket> &tsocket, struct Key &key_A, size_t prune_size) {
+uint64_t Party::get_sizeof_interset_server(struct Key &key_A, size_t prune_size) {
 	prune_size = prune_size > kvdataset.GetKVDatasetSize() ? kvdataset.GetKVDatasetSize() : prune_size;
 
 	// step 1
@@ -335,7 +331,7 @@ uint64_t Party::get_sizeof_interset_server(std::unique_ptr<CSocket> &tsocket, st
 
 	for(int i = 0; i < M; i ++) {
 		uint64_t enc = this->encrypt_bit(blm[i], key_A);
-		tsocket->Send((void *)&enc, sizeof(enc));
+		this->tsocket->Send((void *)&enc, sizeof(enc));
 	}
 
 	// step 2
@@ -346,7 +342,7 @@ uint64_t Party::get_sizeof_interset_server(std::unique_ptr<CSocket> &tsocket, st
 		for(int j = 0; j < H.size(); j ++)
 		{
 			uint64_t value;
-			tsocket->Receive((void *)&value, sizeof(value));
+			this->tsocket->Receive((void *)&value, sizeof(value));
 			EB.push_back(value);
 		}
 		EB_list.push_back(EB);
@@ -364,12 +360,12 @@ uint64_t Party::get_sizeof_interset_server(std::unique_ptr<CSocket> &tsocket, st
 		}
 		if(flag) c += 1;
 	}
-	tsocket->Send((void *)&c, sizeof(c));
+	this->tsocket->Send((void *)&c, sizeof(c));
 	return c;
 }
 
 
-uint64_t Party::get_sizeof_interset_client(std::unique_ptr<CSocket> &tsocket, struct Key &key_A, size_t prune_size) {
+uint64_t Party::get_sizeof_interset_client(struct Key &key_A, size_t prune_size) {
 	prune_size = prune_size > kvdataset.GetKVDatasetSize() ? kvdataset.GetKVDatasetSize() : prune_size;
 
 	// step 1
@@ -377,7 +373,7 @@ uint64_t Party::get_sizeof_interset_client(std::unique_ptr<CSocket> &tsocket, st
 	for(int i = 0; i < M; i ++)
 	{
 		uint64_t cipher;
-		tsocket->Receive((void *)&cipher, sizeof(cipher));
+		this->tsocket->Receive((void *)&cipher, sizeof(cipher));
 		cblm.push_back(cipher);
 	}
 
@@ -393,13 +389,13 @@ uint64_t Party::get_sizeof_interset_client(std::unique_ptr<CSocket> &tsocket, st
 			uint64_t bh = cblm[hv];
 			uint64_t qrm = this->encrypt_bit(0, key_A);
 			uint64_t value = integer_mulmod(bh, qrm, key_A.pub.n);
-			tsocket->Send((void *)&value, sizeof(value));
+			this->tsocket->Send((void *)&value, sizeof(value));
 		}
 	}
 
 	// step 3
 	int c(0);
-	tsocket->Receive((void *)&c, sizeof(c));
+	this->tsocket->Receive((void *)&c, sizeof(c));
 	return c;
 }
 
@@ -408,51 +404,34 @@ void Party::Prune()
 {
 	size_t i;
 	struct bloom * blm;
-	unique_ptr<CSocket> tsocket;
 	size_t nr_interset;
 
 	assert(this->role == SERVER || this->role == CLIENT);
 
 	if(role == SERVER)
 	{
-		tsocket = Listen(address, port);
-		if(!tsocket) {
-			cerr << "Listen Failed!" << endl;
-			exit(1);
-		}
-
 		struct Key key_A = this->read_key();
-		tsocket->Send((void *)&(key_A.pub), sizeof(key_A.pub));
+		this->tsocket->Send((void *)&(key_A.pub), sizeof(key_A.pub));
 
 		for(i = 0; i < prune_times; i ++)
 		{
 			size_t prune_size = kbar * pow(2, i);
-			nr_interset = this->get_sizeof_interset_server(tsocket, key_A, prune_size);
+			nr_interset = this->get_sizeof_interset_server(key_A, prune_size);
 			if(nr_interset * 1.0 / kbar >= this->mu) break;
 		}
-
-		tsocket->Close();
 	}
 	else
 	{
-		tsocket = Connect(address, port);
-		if(!tsocket) {
-			cerr << "Connect Failed!" << endl;
-			exit(1);
-		}
-
 		struct Key key_A;
-		tsocket->Receive((void *)&(key_A.pub), sizeof(key_A.pub));
+		this->tsocket->Receive((void *)&(key_A.pub), sizeof(key_A.pub));
 
 		for(i = 0; i < prune_times; i ++)
 		{
 			size_t prune_size = kbar * pow(2, i);
-			nr_interset = this->get_sizeof_interset_client(tsocket, key_A, prune_size);
+			nr_interset = this->get_sizeof_interset_client(key_A, prune_size);
 			/* clog << nr_interset << endl; */
 			if(nr_interset * 1.0 / kbar >= this->mu) break;
 		}
-
-		tsocket->Close();
 	}
 
 	if(i >= prune_times)
@@ -483,30 +462,30 @@ void Party::makeMD5set()
 	}
 }
 
-int Party::MakeShareSrv(size_t & index, CSocket * tsocket)
+int Party::MakeShareSrv(size_t & index)
 {
 	int shr_rnd;
 	string str = md5set[index];
 
-	tsocket->Send((void *)str.c_str(), str.size());
-	tsocket->Receive((void *)&shr_rnd, sizeof(shr_rnd));
+	this->tsocket->Send((void *)str.c_str(), str.size());
+	this->tsocket->Receive((void *)&shr_rnd, sizeof(shr_rnd));
 
 	return role == SERVER ? shr_rnd + kvdataset[index].second : shr_rnd - kvdataset[index].second;
 }
 
-int Party::MakeShareCli(CSocket * tsocket)
+int Party::MakeShareCli()
 {
 	// Part 1: decode the message send from server
 	string encoded;
 	encoded.resize(16);
-	tsocket->Receive((void *)&encoded[0], encoded.size());
+	this->tsocket->Receive((void *)&encoded[0], encoded.size());
 
 	// Part 2: check the local kvdataset and find the same one
 	auto i = find(md5set.begin(), md5set.end(), encoded);
 	size_t index = i - md5set.begin();
 
 	int shr_rnd = rand() & MASK;
-	tsocket->Send((void *)&shr_rnd, sizeof(shr_rnd));
+	this->tsocket->Send((void *)&shr_rnd, sizeof(shr_rnd));
 	int rtn = role == SERVER ? shr_rnd + kvdataset[index].second : shr_rnd - kvdataset[index].second;
 
 	if(index < kvdataset.GetKVDatasetSize())
@@ -521,7 +500,6 @@ int Party::MakeShareCli(CSocket * tsocket)
 
 void Party::Merge()
 {
-	unique_ptr<CSocket> tsocket;
 	makeMD5set();
 	this->shr_dataset.clear();
 
@@ -529,50 +507,36 @@ void Party::Merge()
 
 	if(role == SERVER)
 	{
-		tsocket = Listen(address, port);
-		if(!tsocket) {
-			cerr << "Listen Failed!" << endl;
-			exit(1);
-		}
-
 		len = prune_size < this->kvdataset.GetKVDatasetSize() ? prune_size : this->kvdataset.GetKVDatasetSize();
-		tsocket->Send((void *)&len, sizeof(len));
+		this->tsocket->Send((void *)&len, sizeof(len));
 		for(size_t i = 0; i < len; i ++)
 		{
-			KVpair tmp_kv(kvdataset[i].first, MakeShareSrv(i, tsocket.get()));
+			KVpair tmp_kv(kvdataset[i].first, MakeShareSrv(i));
 			shr_dataset.push_back(tmp_kv);
 		}
 
-		tsocket->Receive((void *)&len, sizeof(len));
+		this->tsocket->Receive((void *)&len, sizeof(len));
 		for(size_t i = 0; i < len; i ++) {
-			KVpair tmp_kv("", MakeShareCli(tsocket.get()));
+			KVpair tmp_kv("", MakeShareCli());
 			shr_dataset.push_back(tmp_kv);
 		}
 	}
 	else {
-		tsocket = Connect(address, port);
-		if(!tsocket) {
-			cerr << "Connect Failed!" << endl;
-			exit(1);
-		}
-
-		tsocket->Receive((void *)&len, sizeof(len));
+		this->tsocket->Receive((void *)&len, sizeof(len));
 		for(size_t i = 0; i < len; i ++)
 		{
-			KVpair tmp_kv("", MakeShareCli(tsocket.get()));
+			KVpair tmp_kv("", MakeShareCli());
 			shr_dataset.push_back(tmp_kv);
 		}
 
 		len = prune_size;
-		tsocket->Send((void *)&len, sizeof(len));
+		this->tsocket->Send((void *)&len, sizeof(len));
 		for(size_t i = 0; i < len; i++)
 		{
-			KVpair tmp_kv(kvdataset[i].first, MakeShareSrv(i, tsocket.get()));
+			KVpair tmp_kv(kvdataset[i].first, MakeShareSrv(i));
 			shr_dataset.push_back(tmp_kv);
 		}
 	}
-
-	tsocket->Close();
 }
 
 // non-Secure compare
@@ -580,39 +544,25 @@ bool Party::compare(KVpair & kv1, KVpair & kv2)
 {
 	this->comparetimes ++;
 
-	unique_ptr<CSocket> tsocket;
 	bool flag(false);
 	if(role == SERVER) {
-		tsocket = Listen(address, port);
-		if(!tsocket) {
-			cerr << "Listen Failed!" << endl;
-			exit(1);
-		}
-
 		int count1, count2;
-		tsocket->Receive((void *)&count1, sizeof(count1));
-		tsocket->Receive((void *)&count2, sizeof(count2));
+		this->tsocket->Receive((void *)&count1, sizeof(count1));
+		this->tsocket->Receive((void *)&count2, sizeof(count2));
 
 		flag = kv1.second - count1 > kv2.second - count2;
-		tsocket->Send((void *)&flag, sizeof(flag));
+		this->tsocket->Send((void *)&flag, sizeof(flag));
 	}
 	else {
-		tsocket = Connect(address, port);
-		if(!tsocket) {
-			cerr << "Connect Failed!" << endl;
-			exit(1);
-		}
-
 		int rnd = rand() & MASK;
 		int count1, count2;
 		count1 = kv1.second - rnd;
 		count2 = kv2.second - rnd;
-		tsocket->Send((void *)&count1, sizeof(count1));
-		tsocket->Send((void *)&count2, sizeof(count2));
+		this->tsocket->Send((void *)&count1, sizeof(count1));
+		this->tsocket->Send((void *)&count2, sizeof(count2));
 
-		tsocket->Receive((void *)&flag, sizeof(flag));
+		this->tsocket->Receive((void *)&flag, sizeof(flag));
 	}
-	tsocket->Close();
 
 	return flag;
 }
@@ -790,31 +740,14 @@ double Party::get_delta_q(double delta, size_t kbar, double c)
 
 double Party::get_T(double delta_q, double eps1, double eps2)
 {
-	unique_ptr<CSocket> tsocket;
-
 	double T;
 	if(role == SERVER) {
-		tsocket = Listen(address, port);
-		if(!tsocket) {
-			cerr << "Listen Failed" << endl;
-			exit(1);
-		}
-
 		T = log( 1/delta_q ) / (eps2 / 2) + gen_laplace(0, 1/eps1);
 		tsocket->Send((void *)&T, sizeof(T));
-		tsocket->Close();
 	}
 	else {
-		tsocket = Connect(address, port);
-		if(!tsocket) {
-			cerr << "Connect Failed" << endl;
-			exit(1);
-		}
-
 		tsocket->Receive((void *)&T, sizeof(T));
-		tsocket->Close();
 	}
-
 	return T;
 }
 
@@ -858,28 +791,12 @@ double Party::get_qi(size_t i, double eps2)
 	double qi_n;
 	if(role == SERVER)
 	{
-		unique_ptr<CSocket> tsocket;
-		tsocket = Listen(address, port);
-		if(!tsocket) {
-			cerr << "Listen Failed!" << endl;
-			exit(1);
-		}
-
 		qi_n = qi + gen_laplace(0, 1/eps2);
 		tsocket->Send((void*)&qi_n, sizeof(qi_n));
-		tsocket->Close();
 	}
 	else
 	{
-		unique_ptr<CSocket> tsocket;
-		tsocket = Connect(address, port);
-		if(!tsocket) {
-			cerr << "Connect Failed" << endl;
-			exit(1);
-		}
-
 		tsocket->Receive((void*)&qi_n, sizeof(qi_n));
-		tsocket->Close();
 	}
 
 	return qi_n;
@@ -888,30 +805,14 @@ double Party::get_qi(size_t i, double eps2)
 double Party::generate_R(double mass)
 {
 	double mass2;
-
-	unique_ptr<CSocket> tsocket;
 	if(role == SERVER) {
-		tsocket = Listen(address, port);
-		if(!tsocket) {
-			cerr << "Listen Failed" << endl;
-			exit(1);
-		}
-
 		tsocket->Send((void*)&mass, sizeof(mass));
 		tsocket->Receive((void *)&mass2, sizeof(mass2));
 	}
 	else {
-		tsocket = Connect(address, port);
-		if(!tsocket) {
-			cerr << "Connect Failed" << endl;
-			exit(1);
-		}
-
 		tsocket->Receive((void *)&mass2, sizeof(mass2));
 		tsocket->Send((void *)&mass, sizeof(mass));
 	}
-
-	tsocket->Close();
 	return mass + mass2;
 }
 
@@ -928,15 +829,8 @@ uint64_t Party::RandomDraw(double mass)
 		}
 	}
 
-	unique_ptr<CSocket> tsocket;
 	uint64_t xrnd;
 	if(role == SERVER) {
-		tsocket = Listen(address, role);
-		if(!tsocket) {
-			cerr << "Listen Failed" << endl;
-			exit(1);
-		}
-
 		while(true) {
 			uint64_t rnd1 = rand();
 			uint64_t rnd2 = rand();
@@ -945,20 +839,11 @@ uint64_t Party::RandomDraw(double mass)
 
 			if(xrnd < M) break;
 		}
-
 		tsocket->Send((void *)&xrnd, sizeof(xrnd));
 	}
 	else {
-		tsocket = Connect(address, role);
-		if(!tsocket) {
-			cerr << "Connect Failed" << endl;
-			exit(1);
-		}
-
 		tsocket->Receive((void *)&xrnd, sizeof(xrnd));
 	}
-	tsocket->Close();
-
 	return xrnd;
 }
 
@@ -1092,33 +977,19 @@ vector<size_t> Party::random_draw_output(double eps_em)
 
 void Party::RandomSelection()
 {
-	unique_ptr<CSocket> tsocket;
-
 	if(role == SERVER) {
-		tsocket = Listen(address, port);
-		if(!tsocket) {
-			cerr << "Listen Failed" << endl;
-			exit(1);
-		}
-
 		size_t len(shr_dataset.size());
 		for(size_t i = 0; i < len; i ++) {
 			uint32_t rnd1 = rand();
 			uint32_t rnd2;
-			tsocket->Send((void *)&rnd1, sizeof(rnd1));
-			tsocket->Receive((void *)&rnd2, sizeof(rnd2));
+			this->tsocket->Send((void *)&rnd1, sizeof(rnd1));
+			this->tsocket->Receive((void *)&rnd2, sizeof(rnd2));
 
 			size_t sel = (rnd1 + rnd2) % shr_dataset.size();
 			shr_dataset.erase(shr_dataset.begin() + sel);
 		}
 	}
 	else {
-		tsocket = Connect(address, port);
-		if(!tsocket) {
-			cerr << "Connect Failed" << endl;
-			exit(1);
-		}
-
 		size_t len(shr_dataset.size());
 		for(size_t i = 0; i < len; i ++) {
 			uint32_t rnd1;
@@ -1130,8 +1001,6 @@ void Party::RandomSelection()
 			shr_dataset.erase(shr_dataset.begin() + sel);
 		}
 	}
-
-	tsocket->Close();
 }
 
 
@@ -1186,75 +1055,60 @@ void Party::Selection()
 
 void Party::MakeTopKPublic()
 {
-	unique_ptr<CSocket> tsocket;
 	/* string md5str; */
 	string itemid;
 	size_t idlength, itemca, itemcb;
 
 	if(this->role == SERVER) {
-		tsocket = Listen(address, port);
-		if(!tsocket) {
-			cerr << "Listen Failed" << endl;
-			exit(1);
-		}
-
 		for(size_t i = 0; i < this->shr_dataset.size(); i++) {
 			itemid = this->shr_dataset[i].first;
 			itemca = this->shr_dataset[i].second; // Item Count a
 			if(itemid.empty() == true) {
 				// Receive ID
-				tsocket->Receive((void *)&idlength, sizeof(idlength));
+				this->tsocket->Receive((void *)&idlength, sizeof(idlength));
 				itemid.resize(idlength);
-				tsocket->Receive((void *)&itemid[0], idlength);
+				this->tsocket->Receive((void *)&itemid[0], idlength);
 			}
 			else {
 				// Send ID
 				idlength = itemid.size();
-				tsocket->Send((void *)&idlength, sizeof(idlength));
-				tsocket->Send((void *)itemid.c_str(), itemid.size());
+				this->tsocket->Send((void *)&idlength, sizeof(idlength));
+				this->tsocket->Send((void *)itemid.c_str(), itemid.size());
 			}
 			// Send Count
-			tsocket->Send((void *)&itemca, sizeof(itemca));
+			this->tsocket->Send((void *)&itemca, sizeof(itemca));
 			// Receive Count
-			tsocket->Receive((void *)&itemcb, sizeof(itemcb));
+			this->tsocket->Receive((void *)&itemcb, sizeof(itemcb));
 
 			this->topkitem.push_back(itemid);
 			this->topk_item_freq.push_back(make_pair(itemid, itemca - itemcb));
 		}
 	}
 	else {
-		tsocket = Connect(address, port);
-		if(!tsocket) {
-			cerr << "Listen Failed" << endl;
-			exit(1);
-		}
-
 		for(size_t i = 0; i < this->shr_dataset.size(); i++) {
 			itemid = shr_dataset[i].first;
 			itemcb = this->shr_dataset[i].second;
 			if(itemid.empty() == false) {
 				// Send ID
 				idlength = itemid.size();
-				tsocket->Send((void *)&idlength, sizeof(idlength));
-				tsocket->Send((void *)itemid.c_str(), itemid.size());
+				this->tsocket->Send((void *)&idlength, sizeof(idlength));
+				this->tsocket->Send((void *)itemid.c_str(), itemid.size());
 			}
 			else {
 				// Receive ID
-				tsocket->Receive((void *)&idlength, sizeof(idlength));
+				this->tsocket->Receive((void *)&idlength, sizeof(idlength));
 				itemid.resize(idlength);
-				tsocket->Receive((void *)&itemid[0], idlength);
+				this->tsocket->Receive((void *)&itemid[0], idlength);
 			}
 			// Receive Count
-			tsocket->Receive((void *)&itemca, sizeof(itemca));
+			this->tsocket->Receive((void *)&itemca, sizeof(itemca));
 			// Send Count
-			tsocket->Send((void *)&itemcb, sizeof(itemcb));
+			this->tsocket->Send((void *)&itemcb, sizeof(itemcb));
 
 			this->topkitem.push_back(itemid);
 			this->topk_item_freq.push_back(make_pair(itemid, itemca - itemcb));
 		}
 	}
-
-	tsocket->Close();
 }
 
 
