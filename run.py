@@ -69,6 +69,7 @@ def onerun(eps, k, kbar, mu, times, port, results_folder_name):
 
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	while (not checkportfree(port)) or (port in port_list):
+		assert(0)
 		port = random.randint(port+2**10, port+2**11)
 		if port > 2**15 + 2**14:
 			port = 2**15 + 2**10
@@ -132,11 +133,11 @@ def main():
 			subprocess.run(runcommand(1),	cwd=f'{times_folder}/client', shell=True, stdout=subprocess.PIPE)
 
 def main_multi():
-	dataset		= 'kosarak'
-	eps_list	= [(1 + 2 * i) / 10 for i in range(20)]
-	k_list		= [64]
+	dataset		= 'IBM' # 'POS' 'IBM'
+	eps_list	= [4.0] #[5 * i / 10 for i in range(1, 9)]
+	k_list		= [8 * i for i in range(1, 17)]
 	mu_list		= [0.9]
-	kbar_list	= [64]
+	kbar_list	= k_list
 	run_times	= 10
 
 	results_folder_name = input('Type the folder name the result located in: ')
@@ -150,19 +151,18 @@ def main_multi():
 
 	base_port = 2**15
 	addi_port = 0
-	bound_port = 2**10
+	bound_port = 2**14
 
 	args = []
 	for eps in eps_list:
 		for k in k_list:
-			for kbar in kbar_list:
-				for mu in mu_list:
-					for times in range(run_times):
-						port = base_port + addi_port % bound_port
-						args.append(
-							(eps, k, kbar, mu, times, port, results_folder_name)
-						)
-						addi_port += 1
+			for mu in mu_list:
+				for times in range(run_times):
+					port = base_port + addi_port % bound_port
+					args.append(
+						(eps, k, k, mu, times, port, results_folder_name)
+					)
+					addi_port += 1
 
 	build_topitemset()
 	genkey()
