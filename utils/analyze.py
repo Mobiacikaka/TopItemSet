@@ -1,17 +1,22 @@
 #!/bin/python3
 
+import logging
 from numpy import average
 
 def ReadRealTopK():
 	with open('./realtopk.txt') as f:
 		return [line.strip('\n') for line in f.readlines()][:128]
 
-def ReadMineTopK(arg, time) -> list:
+def ReadMineTopK(arg, time) -> list | bool:
 	eps, k, mu = arg
 	folder = f'{result_folder_name}/eps_{eps}_k_{k}_kbar_{k}_mu_{mu}/{time}'
 
-	srv_file = open(f'{folder}/server/itemset_2_select.out')
-	cli_file = open(f'{folder}/client/itemset_2_select.out')
+	try:
+		srv_file = open(f'{folder}/server/itemset_2_select.out')
+		cli_file = open(f'{folder}/client/itemset_2_select.out')
+	except:
+		logging.error(f'{folder} has error!')
+		return False
 
 	srv_lines = srv_file.readlines()
 	cli_lines = cli_file.readlines()
@@ -62,8 +67,10 @@ def analyze():
 		ncr_list_time = []
 		for time in range(run_times):
 			mine_topk_list = ReadMineTopK(arg, time)
-			ji_list_time.append(cal_ji(real_topk_list[:k], mine_topk_list))
-			ncr_list_time.append(cal_ncr(real_topk_list[:k], mine_topk_list))
+			if mine_topk_list != False:
+				assert(type(mine_topk_list) == list)
+				ji_list_time.append(cal_ji(real_topk_list[:k], mine_topk_list))
+				ncr_list_time.append(cal_ncr(real_topk_list[:k], mine_topk_list))
 		ji_list.append(average(ji_list_time))
 		ncr_list.append(average(ncr_list_time))
 
@@ -72,6 +79,7 @@ def analyze():
 
 if __name__ == '__main__':
 	dataset = input('Dataset: ')
+	var = input('eps or k: ') or 'eps'
 	result_folder_name = ''
 	eps_list = []
 	k_list = []
@@ -91,5 +99,8 @@ if __name__ == '__main__':
 		eps_list = [4.0]
 		k_list = [8, 16, 32, 48, 64, 80, 96, 112, 128]
 
-	set_global_to_var_eps()
+	if var == 'eps':
+		set_global_to_var_eps()
+	else:
+		set_global_to_var_k()
 	analyze()
