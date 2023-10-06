@@ -5,16 +5,19 @@ import heapq
 def readfile(filename):
 	f = open(filename)
 	ls = f.readlines()
-	ls = [l[:-1].split(' ') for l in ls]
+	ls = [l.strip('\n').split(' ') for l in ls]
 	return ls
 
 def realtopk(data: list[list[str]]):
-	coutdict = {}
+	countdict = {}
 	for line in data:
 		for item in line:
-			coutdict[item] += 1
+			if countdict.get(item) != None:
+				countdict[item] += 1
+			else:
+				countdict[item] = 1
 
-	countsorted = sorted(coutdict.items(), key=lambda item: item[1], reverse=True)
+	countsorted = sorted(countdict.items(), key=lambda item: item[1], reverse=True)
 	countsorted = countsorted[:k]
 	return countsorted
 
@@ -86,6 +89,49 @@ def build_candidate_itemsets(keyfreqlist: list[tuple], k):
 		cand_set_list.append(tuple(cand_list[j]))
 	return cand_set_map, cand_set_list
 
+def count_candidate_itemsets_freq(data: list[list[str]], cand_set_list: list):
+	cand_set_freq_list = {}
+	for cand_set in cand_set_list:
+		cand_set_freq_list[cand_set] = 0
+
+	for userdata in data:
+		userdata = set(userdata)
+		for cand_set in cand_set_list:
+			_cand_set = set(cand_set)
+			if _cand_set.issubset(userdata):
+				cand_set_freq_list[cand_set] += 1
+
+	return cand_set_freq_list
+
+def combine_items_with_itemsets(topkitem: list, topkitemset: dict, k):
+	count_dict = {}
+	for key, freq in topkitem:
+		count_dict[key] = freq
+	for key, freq in topkitemset.items():
+		count_dict[key] = freq
+
+	topk_itemsets = sorted(count_dict.items(), key=lambda item: item[1], reverse=True)
+	return topk_itemsets[:k]
+
+def calculate_topk_itemsets(role):
+	filename = ''
+	if role == 0:
+		filename = 'server.txt'
+	elif role == 1:
+		filename = 'client.txt'
+	else:
+		assert(0)
+
+	data = readfile(filename)
+	keyfreqlist = realtopk(data)
+	cand_set_map, cand_set_list = build_candidate_itemsets(keyfreqlist, k)
+	cand_set_freq_list = count_candidate_itemsets_freq(data, cand_set_list)
+	topk_itemsets = combine_items_with_itemsets(keyfreqlist, cand_set_freq_list, k)
+	print(topk_itemsets)
+	return topk_itemsets
+
 if __name__ == '__main__':
 	eps = 4.0
 	k   = 32
+	server_dict = calculate_topk_itemsets(0)
+	client_dict = calculate_topk_itemsets(1)
