@@ -2,6 +2,7 @@
 
 import logging
 from numpy import average
+import os
 
 def ReadRealTopK():
 	with open('./realtopk.txt') as f:
@@ -79,6 +80,7 @@ def analyze():
 
 if __name__ == '__main__':
 	dataset = input('Dataset: ')
+	os.chdir(f'./datasets/{dataset}')
 	var = input('eps or k: ') or 'eps'
 	result_folder_name = ''
 	eps_list = []
