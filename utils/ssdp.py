@@ -8,7 +8,7 @@ def readfile(filename):
 	ls = [l.strip('\n').split(' ') for l in ls]
 	return ls
 
-def realtopk(data: list[list[str]]):
+def realtopk(data: list[list[str]], k):
 	countdict = {}
 	for line in data:
 		for item in line:
@@ -86,7 +86,8 @@ def build_candidate_itemsets(keyfreqlist: list[tuple], k):
 	cand_set_list = []
 	for j in sorted_indices[-k:]:
 		cand_set_map[cand_list[j]] = len(cand_set_list)
-		cand_set_list.append(tuple(cand_list[j]))
+		sorted_cand_list = sorted(cand_list[j])
+		cand_set_list.append(tuple(sorted_cand_list))
 	return cand_set_map, cand_set_list
 
 def count_candidate_itemsets_freq(data: list[list[str]], cand_set_list: list):
@@ -113,7 +114,7 @@ def combine_items_with_itemsets(topkitem: list, topkitemset: dict, k):
 	topk_itemsets = sorted(count_dict.items(), key=lambda item: item[1], reverse=True)
 	return topk_itemsets[:k]
 
-def calculate_topk_itemsets(role):
+def calculate_topk_itemsets(role, k):
 	filename = ''
 	if role == 0:
 		filename = 'server.txt'
@@ -123,15 +124,50 @@ def calculate_topk_itemsets(role):
 		assert(0)
 
 	data = readfile(filename)
-	keyfreqlist = realtopk(data)
+	keyfreqlist = realtopk(data, k)
 	cand_set_map, cand_set_list = build_candidate_itemsets(keyfreqlist, k)
 	cand_set_freq_list = count_candidate_itemsets_freq(data, cand_set_list)
 	topk_itemsets = combine_items_with_itemsets(keyfreqlist, cand_set_freq_list, k)
 	print(topk_itemsets)
 	return topk_itemsets
 
-if __name__ == '__main__':
+def merge(server_dict: list, client_dict: list):
+	merge_dict = {}
+	for key, _ in server_dict:
+		merge_dict[key] = 0
+	for key, _ in client_dict:
+		merge_dict[key] = 0
+	for key, freq in server_dict:
+		merge_dict[key] += freq
+	for key, freq in client_dict:
+		merge_dict[key] += freq
+	return merge_dict
+
+def sort(merge_dict: dict):
+	sorted_merge_list = sorted(merge_dict.items(), key=lambda item: item[1], reverse=True)
+	return sorted_merge_list
+
+def select(sorted_itemsets, eps, k):
+	eps_one = eps / k
+	utility = list(range(len(sorted_itemsets)))
+	weight = [eps_one * uti for uti in utility]
+	gap = numpy.zeros(len(sorted_itemsets)).tolist()
+	for i in range(len(sorted_itemsets) - 1):
+		gap[i] = sorted_itemsets[i][1] - sorted_itemsets[i+1][1]
+	gap[-1] = sorted_itemsets[-1][1]
+	print(utility)
+	print(weight)
+	print(gap)
+
+def run():
 	eps = 4.0
-	k   = 32
-	server_dict = calculate_topk_itemsets(0)
-	client_dict = calculate_topk_itemsets(1)
+	k   = 32 * 3
+	server_dict = calculate_topk_itemsets(0, k)
+	client_dict = calculate_topk_itemsets(1, k)
+	# merge_dict = merge(server_dict, client_dict)
+	# sorted_itemsets = sort(merge_dict)
+	# print(sorted_itemsets)
+	# select(sorted_itemsets, eps, k)
+
+if __name__ == '__main__':
+	run()
