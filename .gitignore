@@ -33,5 +33,5 @@
 
 build
 datasets
-src/__pycache__
+utils/__pycache__
 key.txt
