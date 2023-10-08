@@ -134,10 +134,10 @@ def main():
 
 def main_multi():
 	dataset		= 'IBM' # 'POS' 'IBM'
-	eps_list	= [4.0]
-	# eps_list	= [5 * i / 10 for i in range(1, 9)]
-	# k_list		= [32]
-	k_list		= [8, 16, 32, 48, 64, 80, 96, 112, 128]
+	# eps_list	= [4.0]
+	eps_list	= [5 * i / 10 for i in range(1, 9)]
+	k_list		= [32]
+	# k_list		= [8, 16, 32, 48, 64, 80, 96, 112, 128]
 	mu_list		= [0.9]
 	kbar_list	= k_list
 	run_times	= 10
