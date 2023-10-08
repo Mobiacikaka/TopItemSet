@@ -1,6 +1,8 @@
 #!/bin/python3
 import numpy
 import heapq
+import copy
+import random
 
 def readfile(filename):
 	f = open(filename)
@@ -128,8 +130,63 @@ def calculate_topk_itemsets(role, k):
 	cand_set_map, cand_set_list = build_candidate_itemsets(keyfreqlist, k)
 	cand_set_freq_list = count_candidate_itemsets_freq(data, cand_set_list)
 	topk_itemsets = combine_items_with_itemsets(keyfreqlist, cand_set_freq_list, k)
-	print(topk_itemsets)
+	# print(topk_itemsets)
 	return topk_itemsets
+
+def RandomDraw(R: int):
+	mask = 0
+	while R >> mask > 0:
+		mask += 1
+	mask = 2 ** mask - 1
+
+	for _ in range(2**20):
+		r = random.randint(0, mask)
+		if r < R:
+			return r
+	exit()
+
+def select(topk_itemsets: list[tuple], eps):
+	topk_itemsets = [('', 0)] + topk_itemsets[::-1] + topk_itemsets + [('', 0)]
+	length = len(topk_itemsets)
+	gap  = [0] * length
+	mass = [0] * length
+	t    = 0
+	for i in range(1, length-1):
+		utility = i - length/2 + 1 if i < length/2 else length/2 - i
+		weight = numpy.exp(eps * utility)
+		if i <= length/2 - 1:
+			gap[i] = topk_itemsets[i][1] - topk_itemsets[i-1][1]
+		else:
+			gap[i] = topk_itemsets[i][1] - topk_itemsets[i+1][1]
+		mass[i] = t + weight * gap[i]
+		t = mass[i]
+	mass[-1] = mass[-2]
+
+	# print('\n', gap)
+	# print('\n', mass)
+
+	R = mass[-1]
+	r = RandomDraw(int(R))
+	j = -1
+	for i in range(length):
+		if r < mass[i] and j == -1:
+			j = i
+			break
+	# print(r, '\t', mass[j], mass[j-1], '\t', topk_itemsets[j])
+	return topk_itemsets[j]
+
+def multi_select(topk_itemsets: list[tuple], eps, k):
+	selection = []
+	topk_itemsets = copy.deepcopy(topk_itemsets)
+	for _ in range(k):
+		sel = select(copy.deepcopy(topk_itemsets), eps / k)
+		try:
+			topk_itemsets.remove(sel)
+		except:
+			pass
+		selection.append(sel)
+		# exit()
+	return selection
 
 def merge(server_dict: list, client_dict: list):
 	merge_dict = {}
@@ -147,27 +204,16 @@ def sort(merge_dict: dict):
 	sorted_merge_list = sorted(merge_dict.items(), key=lambda item: item[1], reverse=True)
 	return sorted_merge_list
 
-def select(sorted_itemsets, eps, k):
-	eps_one = eps / k
-	utility = list(range(len(sorted_itemsets)))
-	weight = [eps_one * uti for uti in utility]
-	gap = numpy.zeros(len(sorted_itemsets)).tolist()
-	for i in range(len(sorted_itemsets) - 1):
-		gap[i] = sorted_itemsets[i][1] - sorted_itemsets[i+1][1]
-	gap[-1] = sorted_itemsets[-1][1]
-	print(utility)
-	print(weight)
-	print(gap)
-
 def run():
 	eps = 4.0
-	k   = 32 * 3
-	server_dict = calculate_topk_itemsets(0, k)
-	client_dict = calculate_topk_itemsets(1, k)
-	# merge_dict = merge(server_dict, client_dict)
-	# sorted_itemsets = sort(merge_dict)
-	# print(sorted_itemsets)
-	# select(sorted_itemsets, eps, k)
+	k   = 8
+	server_itemsets = calculate_topk_itemsets(0, 3 * k)
+	client_itemsets = calculate_topk_itemsets(1, 3 * k)
+	selection_srv   = multi_select(server_itemsets, eps, k)
+	selection_cli   = multi_select(client_itemsets, eps, k)
+	merge_itemsets  = merge(selection_srv, selection_cli)
+	sorted_itemsets = sort(merge_itemsets)
+	print(sorted_itemsets[:k])
 
 if __name__ == '__main__':
 	run()
