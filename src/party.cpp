@@ -501,7 +501,7 @@ int Party::MakeShareCli()
 void Party::Merge()
 {
 	makeMD5set();
-	this->shr_dataset.clear();
+	/* this->shr_dataset.clear(); */
 
 	size_t len;
 
@@ -1135,7 +1135,7 @@ void Party::ConstructCandidateItemSet()
 	/* size_t queuesize = this->k^2; */
 	priority_queue<Set_Freq_pair, vector<Set_Freq_pair>, Comparator> IS_invert;
 
-	for(size_t setsize = 1; setsize <= boundsize; setsize ++)
+	for(size_t setsize = 2; setsize <= boundsize; setsize ++)
 	{
 		bool levelflag(false);
 
