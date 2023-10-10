@@ -501,7 +501,11 @@ int Party::MakeShareCli()
 void Party::Merge()
 {
 	makeMD5set();
-	/* this->shr_dataset.clear(); */
+	for(size_t i = 0; i < this->shr_dataset.size(); i ++)
+	{
+		if(this->shr_dataset[i].first.empty() == false)
+			this->shr_dataset[i].first += ',';
+	}
 
 	size_t len;
 
