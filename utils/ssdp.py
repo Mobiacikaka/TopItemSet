@@ -1,8 +1,10 @@
 #!/bin/python3
+from os import system
 import numpy
 import heapq
 import copy
 import random
+import multiprocessing
 
 def readfile(filename):
 	f = open(filename)
@@ -109,7 +111,8 @@ def count_candidate_itemsets_freq(data: list[list[str]], cand_set_list: list):
 def combine_items_with_itemsets(topkitem: list, topkitemset: dict, k):
 	count_dict = {}
 	for key, freq in topkitem:
-		count_dict[key] = freq
+		key = tuple([key])
+		count_dict[(key)] = freq
 	for key, freq in topkitemset.items():
 		count_dict[key] = freq
 
@@ -204,16 +207,56 @@ def sort(merge_dict: dict):
 	sorted_merge_list = sorted(merge_dict.items(), key=lambda item: item[1], reverse=True)
 	return sorted_merge_list
 
-def run():
-	eps = 4.0
-	k   = 8
+def run(eps: float, k: int, foldername: str):
+	print('eps', eps, 'k', k, foldername)
 	server_itemsets = calculate_topk_itemsets(0, 3 * k)
 	client_itemsets = calculate_topk_itemsets(1, 3 * k)
 	selection_srv   = multi_select(server_itemsets, eps, k)
 	selection_cli   = multi_select(client_itemsets, eps, k)
 	merge_itemsets  = merge(selection_srv, selection_cli)
 	sorted_itemsets = sort(merge_itemsets)
-	print(sorted_itemsets[:k])
+
+	system(f'mkdir -p {foldername}')
+	outfile = open(f'{foldername}/ssdp.txt', 'w')
+	for itemset, freq in sorted_itemsets[:k]:
+		itemset = list(itemset)
+		outfile.write(','.join(itemset) + f',\t{freq}\n')
+	outfile.close()
+
+def multi_run():
+	times    = 10
+
+	def set_var_eps():
+		eps_list = [5 * i / 10 for i in range(1,9)]
+		k_list = [32]
+		result_f = 'result_eps'
+		return eps_list, k_list, result_f
+
+	def set_var_k():
+		eps_list = [4.0]
+		k_list = [8, 16, 32, 48, 64, 80, 96, 112, 128]
+		result_f = 'result_k'
+		return eps_list, k_list, result_f
+
+	def set_var_test():
+		eps_list = [1.0]
+		k_list = [8]
+		result_f = 'test'
+		return eps_list, k_list, result_f
+
+	eps_list, k_list, result_f = set_var_k()
+
+	args = [
+		(eps, k, f'ssdp/{result_f}/eps_{eps}_k_{k}/{t}')
+		for eps in eps_list
+		for k in k_list
+		for t in range(times)
+	]
+
+	pool = multiprocessing.Pool(multiprocessing.cpu_count() - 4)
+	pool.starmap(run, args)
+	pool.close()
+	pool.join()
 
 if __name__ == '__main__':
-	run()
+	multi_run()
