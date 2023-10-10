@@ -5,8 +5,8 @@ from numpy import average
 import os
 
 def ReadRealTopK():
-	with open('./realtopk.txt') as f:
-		return [line.strip('\n') for line in f.readlines()][:128]
+	f = open('./realtopk.txt')
+	return [line.strip('\n') for line in f.readlines()][:128]
 
 def ReadMineTopK(arg, time) -> list | bool:
 	eps, k, mu = arg
@@ -82,6 +82,7 @@ if __name__ == '__main__':
 	dataset = input('Dataset: ')
 	os.chdir(f'./datasets/{dataset}')
 	var = input('eps or k: ') or 'eps'
+	print(os.getcwd())
 	result_folder_name = ''
 	eps_list = []
 	k_list = []
