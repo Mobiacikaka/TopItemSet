@@ -258,5 +258,66 @@ def multi_run():
 	pool.close()
 	pool.join()
 
+def analyze():
+	def set_var_eps():
+		eps_list = [5 * i / 10 for i in range(1,9)]
+		k_list = [32]
+		result_f = 'result_eps'
+		return eps_list, k_list, result_f
+
+	def set_var_k():
+		eps_list = [4.0]
+		k_list = [8, 16, 32, 48, 64, 80, 96, 112, 128]
+		result_f = 'result_k'
+		return eps_list, k_list, result_f
+
+	def cal_ji(real: list, mine: list) -> float:
+		c = 0
+		for item in real:
+			if item in mine:
+				c += 1
+		return c / (len(real) + len(mine) - c)
+
+	def cal_ncr(real: list, mine: list) -> float:
+		s = 0
+		length = len(real)
+		for i in range(length):
+			if real[i] in mine:
+				s += (len(real) - i)
+		return s * 2 / (length * (length + 1))
+
+	def ReadRealTopK():
+		f = open('./realtopk.txt')
+		return [line.strip('\n') for line in f.readlines()][:128]
+
+	eps_list, k_list, result_f = set_var_k()
+
+	args = [
+		(eps, k, f'ssdp/{result_f}/eps_{eps}_k_{k}')
+		for eps in eps_list
+		for k in k_list
+	]
+
+	real_topk_list = ReadRealTopK()
+	total_ji_list  = []
+	total_ncr_list = []
+
+	for arg in args:
+		eps, k, foldername = arg
+		ji_list = []
+		ncr_list = []
+		for t in range(10):
+			ssdpf = open(f'{foldername}/{t}/ssdp.txt')
+			lines = ssdpf.readlines()
+			topk  = [l.split('\t')[0] for l in lines]
+			ji_list.append(cal_ji(real_topk_list[:k], topk[:k]))
+			ncr_list.append(cal_ncr(real_topk_list[:k], topk[:k]))
+		total_ji_list.append(numpy.average(ji_list))
+		total_ncr_list.append(numpy.average(ncr_list))
+
+	print(total_ji_list)
+	print(total_ncr_list)
+
 if __name__ == '__main__':
-	multi_run()
+	# multi_run()
+	analyze()
