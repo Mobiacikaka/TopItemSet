@@ -245,6 +245,8 @@ def multi_run():
 		return eps_list, k_list, result_f
 
 	eps_list, k_list, result_f = set_var_k()
+	eps_list = [0.5, 1.0, 2.0, 4.0]
+	k_list = [16, 32, 64]
 
 	args = [
 		(eps, k, f'ssdp/{result_f}/eps_{eps}_k_{k}/{t}')
@@ -291,6 +293,8 @@ def analyze():
 		return [line.strip('\n') for line in f.readlines()][:128]
 
 	eps_list, k_list, result_f = set_var_k()
+	eps_list = [0.5, 1.0, 2.0, 4.0]
+	k_list = [16, 32, 64]
 
 	args = [
 		(eps, k, f'ssdp/{result_f}/eps_{eps}_k_{k}')

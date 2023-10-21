@@ -106,4 +106,7 @@ if __name__ == '__main__':
 		set_global_to_var_eps()
 	else:
 		set_global_to_var_k()
+	result_folder_name = 'result_total'
+	eps_list = [0.5, 1.0, 2.0]
+	k_list = [16, 32, 64]
 	analyze()

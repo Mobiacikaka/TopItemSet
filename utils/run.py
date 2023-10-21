@@ -32,7 +32,7 @@ def genkey():
 	f.close()
 
 def mkdir(foldername: str):
-	flag = os.system(f'mkdir \"{foldername}\"')
+	flag = os.system(f'mkdir -p \"{foldername}\"')
 	if flag == 256:
 		print('Folder exist, please choose another name')
 		exit()
@@ -133,8 +133,8 @@ def main():
 			subprocess.run(runcommand(1),	cwd=f'{times_folder}/client', shell=True, stdout=subprocess.PIPE)
 
 def main_multi():
-	dataset		= 'IBM'
-	eps_list	= [4.0]
+	dataset		= 'POS'
+	eps_list	= [0.5, 1.0, 2.0]
 	# eps_list	= [5 * i / 10 for i in range(1, 9)]
 	# k_list		= [32]
 	k_list		= [8, 16, 32, 48, 64, 80, 96, 112, 128]
@@ -147,8 +147,9 @@ def main_multi():
 	if os.path.isdir(results_folder_name):
 		flag = input('Folder exists, override? y or n: ') or 'n'
 		assert(flag == 'y' or flag == 'n')
-		if flag == 'y':
-			os.system(f'rm -rf {results_folder_name}')
+		if flag == 'n':
+			print('Please specify another name of folder.')
+			exit()
 	mkdir(results_folder_name)
 
 	base_port = 2**15
