@@ -20,6 +20,7 @@ struct Key {
 class Party
 {
 private:
+	Dataset *userdataset;
 	KVDataset kvdataset;
 	std::vector<KVpair> shr_dataset;
 	void PrintShareDataset(std::ostream &out);
@@ -88,7 +89,6 @@ private:
 	void SecurePartition();
 
 	void CalculateTopKItem(Dataset & original_dataset);
-	void CalculateTopKItemSet(Dataset & original_dataset);
 	void CalculateTopKItemSet_FrequencyEstimate(Dataset & original_dataset);
 
 	std::vector<Set_Freq_pair> IS; // candidate set

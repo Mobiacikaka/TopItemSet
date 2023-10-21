@@ -136,45 +136,6 @@ void Party::CalculateTopKItem(Dataset & original_dataset)
 	clog << "Selection Finished" << endl;
 }
 
-void Party::CalculateTopKItemSet(Dataset & original_dataset)
-{
-	clog << endl << "Running CalculateTopKItemSet" << endl;
-
-	/* Top K Item Set Selection */
-	/* this->PrintShareDataset(std::cout); */
-	this->MakeTopKPublic();
-	for(size_t i = 0; i < this->topkitem.size(); i++)
-		cout << this->topkitem[i] << "\t"; cout << endl;
-	assert(this->topkitem.size());
-	original_dataset.PruneDataset(this->topkitem);
-	/* original_dataset.PrintDataset(); */
-
-	this->kvdataset.GenerateKVDataset(original_dataset, true);
-	this->kvdataset.SortKVDataset();
-	/* this->kvdataset.PrintKVDataset(std::cout); */
-	delta = this->get_delta(original_dataset.GetDatasetSize());
-
-	clog << "Prune Start" << endl;
-	this->Prune();
-	this->kvdataset.PrintKVDataset("itemset_0_prune.out");
-	clog << "Prune Finished" << endl;
-
-	clog << "Merge Start" << endl;
-	this->Merge();
-	this->PrintShareDataset("itemset_1_merge.out");
-	clog << "Merge Finished" << endl;
-
-	clog << "Sort Start" << endl;
-	this->Sort();
-	this->PrintShareDataset("itemset_2_sort.out");
-	clog << "Sort Finished" << endl;
-
-	clog << "Selection Start" << endl;
-	this->Selection();
-	this->PrintShareDataset("itemset_3_select.out");
-	clog << "Selection Finished" << endl;
-}
-
 void Party::CalculateTopKItemSet_FrequencyEstimate(Dataset & original_dataset)
 {
 	clog << endl << "Running CalculateTopKItemSet" << endl;
@@ -207,7 +168,8 @@ void Party::CalculateTopKItemSet_FrequencyEstimate(Dataset & original_dataset)
 
 void Party::Run()
 {
-	Dataset original_dataset;
+	this->userdataset = new Dataset();
+	Dataset &original_dataset(*this->userdataset);
 
 	if(this->role == SERVER)
 		this->tsocket = Listen(this->address, this->port);
@@ -1112,6 +1074,10 @@ void Party::MakeTopKPublic()
 			this->topkitem.push_back(itemid);
 			this->topk_item_freq.push_back(make_pair(itemid, itemca - itemcb));
 		}
+	}
+
+	for(size_t i = 0; i < this->topk_item_freq.size(); i++) {
+		this->topk_item_freq[i].second = this->userdataset->CountItem(this->topk_item_freq[i].first);
 	}
 }
 

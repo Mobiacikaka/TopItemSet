@@ -1,22 +1,10 @@
 #include "dataset.hpp"
 
-#include <algorithm>
-#include <fstream>
-#include <map>
-#include <iostream>
-#include <cassert>
-#include <bits/stdc++.h>
 using namespace std;
 
-Itemset::Itemset(std::string uncut_str, char del=' ')
+void Itemset::_init_itemset_with_uncut_string(std::string uncut_str, char del)
 {
 	// https://www.geeksforgeeks.org/how-to-split-a-string-in-cc-python-and-java/
-	/* stringstream ss(uncut_str); */
-	/* string word; */
-	/* while (!ss.eof()) { */
-	/* 	getline(ss, word, del); */
-	/* 	this->data.push_back(word); */
-	/* } */
 	size_t begin(0), end(0);
 	while(begin < uncut_str.size())
 	{
@@ -34,31 +22,6 @@ Itemset::Itemset(std::string uncut_str, char del=' ')
 	sort(this->data.begin(), this->data.end());
 }
 
-Itemset::Itemset(std::vector<std::string> cut_str)
-{
-	this->data = cut_str;
-}
-
-void Itemset::PrintItemset() const
-{
-	size_t length = this->data.size();
-	for (size_t i = 0; i < length; i ++)
-	{
-		cout << this->data[i] << ",";
-	}
-	cout << endl;
-}
-
-size_t Itemset::GetItemsetSize() const
-{
-	return this->data.size();
-}
-
-string Itemset::operator[](size_t i) const
-{
-	return this->data[i];
-}
-
 void Itemset::PruneItemset(vector<string> item_remove_exception)
 {
 	vector<string> newdata;
@@ -74,64 +37,6 @@ void Itemset::PruneItemset(vector<string> item_remove_exception)
 	return ;
 }
 
-string Itemset::ConcatWithOrder() const
-{
-	// assert this->data is ordered
-	string concatstr;
-	for(size_t i = 0; i < this->data.size(); i++)
-		concatstr = concatstr + this->data[i] + ",";
-	return concatstr;
-}
-
-bool Itemset::include(std::vector<std::string> &smallset) const
-{
-	// data and smallset must be sorted
-	return includes(
-			this->data.begin(),
-			this->data.end(),
-			smallset.begin(),
-			smallset.end()
-		);
-}
-
-Dataset::Dataset()
-{
-	string uncut_itemset_str;
-	while(getline(cin, uncut_itemset_str, '\n'))
-	{
-		Itemset itemset(uncut_itemset_str);
-		this->data.push_back(itemset);
-	}
-}
-
-Dataset::Dataset(vector<Itemset> &data)
-{
-	this->data = data;
-}
-
-Itemset & Dataset::operator[](size_t i)
-{
-	return this->data[i];
-}
-
-size_t Dataset::GetDatasetSize() const
-{
-	return this->data.size();
-}
-
-void Dataset::PrintDataset() const
-{
-	for(size_t i = 0; i < this->data.size(); i++)
-	{
-		this->data[i].PrintItemset();
-	}
-}
-
-void Dataset::PruneDataset(size_t begin)
-{
-	this->data.erase(this->data.begin() + begin);
-}
-
 void Dataset::PruneDataset(vector<string> item_remove_exception)
 {
 	assert(item_remove_exception.size() > 0);
@@ -142,17 +47,6 @@ void Dataset::PruneDataset(vector<string> item_remove_exception)
 	}
 	this->data = newdata;
 	return;
-}
-
-size_t Dataset::CountSubset(std::vector<std::string> &smallset) const
-{
-	size_t count(0);
-	for(size_t i = 0; i < this->data.size(); i++)
-	{
-		if(this->data[i].include(smallset))
-			count ++;
-	}
-	return count;
 }
 
 // BloomFilter
@@ -225,17 +119,6 @@ void KVDataset::GenerateKVDataset(Dataset &original_dataset, std::vector<Set_Fre
 	}
 }
 
-size_t KVDataset::GetKVDatasetSize() const
-{
-	return this->kvdata.size();
-}
-
-void KVDataset::PrintKVDataset(ostream &out=std::cout) const
-{
-	for(auto it = this->kvdata.begin(); it < this->kvdata.end(); it++)
-		out << it->first << "\t" << it->second << endl;
-}
-
 void KVDataset::PrintKVDataset(std::string filename) const
 {
 	ofstream file(filename);
@@ -244,22 +127,4 @@ void KVDataset::PrintKVDataset(std::string filename) const
 		exit(-1);
 	}
 	this->PrintKVDataset(file);
-}
-
-void KVDataset::SortKVDataset()
-{
-	sort(this->kvdata.begin(),
-		this->kvdata.end(),
-		[](const KVpair &a, const KVpair &b) {return a.second > b.second;}
-	);
-}
-
-void KVDataset::Erase(size_t index)
-{
-	this->kvdata.erase(this->kvdata.begin() + index);
-}
-
-KVpair & KVDataset::operator[](size_t i)
-{
-	return this->kvdata[i];
 }
