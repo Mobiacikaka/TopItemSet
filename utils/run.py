@@ -80,64 +80,13 @@ def onerun(eps, k, kbar, mu, times, port, results_folder_name):
 	subprocess.run(runcommand(1),	cwd=f'{times_folder_name}/client', shell=True, stdout=subprocess.PIPE)
 	port_list.remove(port)
 
-def main():
-	dataset = 'kosarak'
-	eps_list = [2.0]
-	k_list = [40]
-	mu_list = [0.9]
-	kbar_list = [40]
-	run_times = 5
-
-	results_folder_name = input('Type the folder name the result located in: ')
-	results_folder_name = f'{root_dir}/datasets/{dataset}/{results_folder_name}'
-	if os.path.isdir(results_folder_name):
-		flag = input('Folder exists, override? y or n: ') or 'n'
-		assert(flag == 'y' or flag == 'n')
-		if flag == 'y':
-			os.system(f'rm -rf {results_folder_name}')
-	mkdir(results_folder_name)
-
-	args = [
-		(eps, k, kbar, mu)
-		for eps in eps_list
-		for k in k_list
-		for kbar in kbar_list
-		for mu in mu_list
-	]
-
-	build_topitemset()
-	genkey()
-	set_global(dataset)
-
-	for arg in args:
-		eps, k, kbar, mu = arg
-		kbar = k
-		print(f'Running args - eps: {eps}, k: {k}, kbar: {kbar}, mu: {mu}, times: {run_times}')
-		result_folder_name = f'{results_folder_name}/eps_{eps}_k_{k}_kbar_{kbar}_mu_{mu}'
-		mkdir(result_folder_name)
-
-		def runcommand(role=0):
-			datafile = srv_data
-			if role == 1:
-				datafile = cli_data
-			command = f'cat {datafile} | {binary} -k {k} -1 {kbar} -2 {eps} -m {mu} -r {role} > log.out 2>&1'
-			return command
-
-		for times in range(run_times):
-			times_folder = f'{result_folder_name}/{times}'
-			mkdir(times_folder)
-			mkdir(f'{times_folder}/server')
-			mkdir(f'{times_folder}/client')
-			cp(keyfile, f'{times_folder}/server')
-			subprocess.Popen(runcommand(0),	cwd=f'{times_folder}/server', shell=True, stdout=subprocess.PIPE)
-			subprocess.run(runcommand(1),	cwd=f'{times_folder}/client', shell=True, stdout=subprocess.PIPE)
-
 def main_multi():
 	dataset		= 'POS'
 	eps_list	= [0.5, 1.0, 2.0]
 	# eps_list	= [5 * i / 10 for i in range(1, 9)]
-	# k_list		= [32]
-	k_list		= [8, 16, 32, 48, 64, 80, 96, 112, 128]
+	eps_list	= [0.5]
+	k_list		= [32]
+	# k_list		= [8, 16, 32, 48, 64, 80, 96, 112, 128]
 	mu_list		= [0.9]
 	kbar_list	= k_list
 	run_times	= 10

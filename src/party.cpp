@@ -171,13 +171,15 @@ void Party::Run()
 	this->userdataset = new Dataset();
 	Dataset &original_dataset(*this->userdataset);
 
-	if(this->role == SERVER)
-		this->tsocket = Listen(this->address, this->port);
-	else
-		this->tsocket = Connect(this->address, this->port);
-	if(!tsocket)
-	{
-		cerr << "Port connection failed!" << endl;
+	for(size_t i = 0 ; i < 10; i ++) {
+		if(this->role == SERVER)
+			this->tsocket = Listen(this->address, this->port);
+		else
+			this->tsocket = Connect(this->address, this->port);
+		if(tsocket) break;
+	}
+	if(!tsocket) {
+		cerr << "Port Connection Failed!" << endl;
 		exit(-1);
 	}
 
@@ -1021,62 +1023,37 @@ void Party::Selection()
 
 void Party::MakeTopKPublic()
 {
-	/* string md5str; */
 	string itemid;
-	size_t idlength, itemca, itemcb;
+	size_t idlength;
 
-	if(this->role == SERVER) {
-		for(size_t i = 0; i < this->shr_dataset.size(); i++) {
-			itemid = this->shr_dataset[i].first;
-			itemca = this->shr_dataset[i].second; // Item Count a
-			if(itemid.empty() == true) {
-				// Receive ID
-				this->tsocket->Receive((void *)&idlength, sizeof(idlength));
-				itemid.resize(idlength);
-				this->tsocket->Receive((void *)&itemid[0], idlength);
-			}
-			else {
-				// Send ID
-				idlength = itemid.size();
-				this->tsocket->Send((void *)&idlength, sizeof(idlength));
-				this->tsocket->Send((void *)itemid.c_str(), itemid.size());
-			}
-			// Send Count
-			this->tsocket->Send((void *)&itemca, sizeof(itemca));
-			// Receive Count
-			this->tsocket->Receive((void *)&itemcb, sizeof(itemcb));
-
-			this->topkitem.push_back(itemid);
-			this->topk_item_freq.push_back(make_pair(itemid, itemca - itemcb));
+	for(size_t i = 0; i < this->shr_dataset.size(); i++) {
+		itemid = this->shr_dataset[i].first;
+		if(itemid.empty() == true) {
+			// Receive ID
+			this->tsocket->Receive((void *)&idlength, sizeof(idlength));
+			itemid.resize(idlength);
+			this->tsocket->Receive((void *)&itemid[0], idlength);
 		}
-	}
-	else {
-		for(size_t i = 0; i < this->shr_dataset.size(); i++) {
-			itemid = shr_dataset[i].first;
-			itemcb = this->shr_dataset[i].second;
-			if(itemid.empty() == false) {
-				// Send ID
-				idlength = itemid.size();
-				this->tsocket->Send((void *)&idlength, sizeof(idlength));
-				this->tsocket->Send((void *)itemid.c_str(), itemid.size());
-			}
-			else {
-				// Receive ID
-				this->tsocket->Receive((void *)&idlength, sizeof(idlength));
-				itemid.resize(idlength);
-				this->tsocket->Receive((void *)&itemid[0], idlength);
-			}
-			// Receive Count
-			this->tsocket->Receive((void *)&itemca, sizeof(itemca));
-			// Send Count
-			this->tsocket->Send((void *)&itemcb, sizeof(itemcb));
-
-			this->topkitem.push_back(itemid);
-			this->topk_item_freq.push_back(make_pair(itemid, itemca - itemcb));
+		else {
+			// Send ID
+			idlength = itemid.size();
+			this->tsocket->Send((void *)&idlength, sizeof(idlength));
+			this->tsocket->Send((void *)itemid.c_str(), itemid.size());
 		}
+		this->topkitem.push_back(itemid);
+		this->topk_item_freq.push_back(make_pair(itemid, 0));
 	}
 
 	for(size_t i = 0; i < this->topk_item_freq.size(); i++) {
+		bool is_in_kvdataset(false);
+		for(size_t j = 0; j < this->kvdataset.GetKVDatasetSize(); j++) {
+			if(this->kvdataset[i].first == this->topk_item_freq[i].first) {
+				this->topk_item_freq[i].second = this->kvdataset[j].second;
+				is_in_kvdataset = true;
+				break;
+			}
+		}
+		if(is_in_kvdataset) continue;
 		this->topk_item_freq[i].second = this->userdataset->CountItem(this->topk_item_freq[i].first);
 	}
 }
