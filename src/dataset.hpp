@@ -131,7 +131,7 @@ class KVDataset
 
 		void GenerateKVDataset(Dataset &original_dataset);
 		void GenerateKVDataset(Dataset &original_dataset, bool);
-		void GenerateKVDataset(Dataset &original_dataset, std::vector<Set_Freq_pair> &IS);
+		void GenerateKVDataset(Dataset &original_dataset, std::vector<Set_Freq_pair> &IS, std::vector<KVpair> &topk_item_freq);
 		void PrintKVDataset(std::ostream &out) const {
 			for(auto it = this->kvdata.begin(); it < this->kvdata.end(); it ++)
 				out << it->first << "\t" << it->second << std::endl;

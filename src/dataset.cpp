@@ -107,15 +107,36 @@ void KVDataset::GenerateKVDataset(Dataset &original_dataset, bool)
 	);
 }
 
-void KVDataset::GenerateKVDataset(Dataset &original_dataset, std::vector<Set_Freq_pair> &IS)
+void KVDataset::GenerateKVDataset(Dataset &original_dataset, std::vector<Set_Freq_pair> &IS, std::vector<KVpair> &topk_item_freq)
 {
 	this->kvdata.clear();
-	for(size_t i = 0; i < IS.size(); i ++)
-	{
-		Itemset candidate_itemset(IS[i].first);
-		string candidate_concat_str = candidate_itemset.ConcatWithOrder();
-		size_t count = original_dataset.CountSubset(IS[i].first);
-		this->kvdata.push_back(make_pair(candidate_concat_str, count));
+
+	std::map< std::string, std::vector<size_t> > map_item_to_users;
+
+	for(size_t i = 0; i < original_dataset.GetDatasetSize(); i ++) {
+		Itemset itset(original_dataset[i]);
+		for(size_t j = 0; j < topk_item_freq.size(); j ++) {
+			if(itset.include(topk_item_freq[j].first))
+				map_item_to_users[topk_item_freq[j].first].push_back(i);
+		}
+	}
+
+	for(size_t i = 0; i < IS.size(); i ++) {
+		Itemset candset(IS[i].first);
+		string minimal_search_item;
+		size_t minimal_search_times(UINT32_MAX);
+		for(size_t j = 0; j < candset.GetItemsetSize(); j ++) {
+			if(map_item_to_users[candset[j]].size() < minimal_search_times) {
+				minimal_search_item = candset[j];
+				minimal_search_times = map_item_to_users[minimal_search_item].size();
+			}
+		}
+		assert(minimal_search_item.size()); // there must be something
+		vector<size_t> &users_list(map_item_to_users[minimal_search_item]);
+		size_t count(0);
+		for(size_t j = 0; j < users_list.size(); j ++)
+			count += static_cast<size_t>(original_dataset[users_list[j]].include(IS[i].first));
+		this->kvdata.push_back(make_pair(candset.ConcatWithOrder(), count));
 	}
 }
 
