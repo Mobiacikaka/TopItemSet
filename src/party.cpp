@@ -146,7 +146,7 @@ void Party::CalculateTopKItemSet_FrequencyEstimate(Dataset & original_dataset)
 	this->ConstructCandidateItemSet();
 
 	// Generate KVDataset by frequency estimation
-	this->kvdataset.GenerateKVDataset(original_dataset, this->IS);
+	this->kvdataset.GenerateKVDataset(original_dataset, this->IS, this->topk_item_freq);
 	this->kvdataset.SortKVDataset();
 	delta = this->get_delta(original_dataset.GetDatasetSize());
 
@@ -1045,84 +1045,80 @@ void Party::MakeTopKPublic()
 	}
 
 	for(size_t i = 0; i < this->topk_item_freq.size(); i++) {
-		bool is_in_kvdataset(false);
-		for(size_t j = 0; j < this->kvdataset.GetKVDatasetSize(); j++) {
-			if(this->kvdataset[i].first == this->topk_item_freq[i].first) {
-				this->topk_item_freq[i].second = this->kvdataset[j].second;
-				is_in_kvdataset = true;
-				break;
-			}
-		}
-		if(is_in_kvdataset) continue;
+		/* bool is_in_kvdataset(false); */
+		/* for(size_t j = 0; j < this->kvdataset.GetKVDatasetSize(); j++) { */
+		/* 	if(this->kvdataset[i].first == this->topk_item_freq[i].first) { */
+		/* 		this->topk_item_freq[i].second = this->kvdataset[j].second; */
+		/* 		is_in_kvdataset = true; */
+		/* 		break; */
+		/* 	} */
+		/* } */
+		/* if(is_in_kvdataset) continue; */
 		this->topk_item_freq[i].second = this->userdataset->CountItem(this->topk_item_freq[i].first);
 	}
 }
 
-
 void Party::ConstructCandidateItemSet()
 {
-	size_t boundsize = static_cast<size_t>(log2(this->topk_item_freq.size()));
-
+	clog << "ConstructCandidateItemSet" << endl;
 	size_t maxfreq = 0;
 	for(size_t i = 0; i < this->topk_item_freq.size(); i++)
 		if(this->topk_item_freq[i].second > maxfreq)
 			maxfreq = this->topk_item_freq[i].second;
 
-	// sort by the dictionary order
 	sort(
 		this->topk_item_freq.begin(),
 		this->topk_item_freq.end(),
-		[](const KVpair &a, const KVpair &b) {
-			return a.first < b.first;
-		}
+		[](const KVpair &a, const KVpair &b) { return a.first < b.first; }
 	);
 
-	size_t topklistlength(this->topk_item_freq.size());
-	size_t queuesize = pow(2, ceil(log2(2 * this->k)));
-	/* size_t queuesize = this->k^2; */
-	priority_queue<Set_Freq_pair, vector<Set_Freq_pair>, Comparator> IS_invert;
-
-	for(size_t setsize = 2; setsize <= boundsize; setsize ++)
-	{
-		bool levelflag(false);
-
-		string bitmask(setsize, 1);
-		bitmask.resize(topklistlength);
-		do {
-			vector<string> comb;
-			double freq(-1.0);
-			for(size_t j = 0; j < topklistlength; j ++)
-			{
-				if(bitmask[j])
-				{
-					comb.push_back(this->topk_item_freq[j].first);
-					freq *= (0.9 * this->topk_item_freq[j].second) / maxfreq;
-				}
-			}
-			if(IS_invert.size() <= queuesize) {
-				IS_invert.push(make_pair(comb, freq));
-				levelflag = true;
-			}
-			else {
-				if(IS_invert.top().second >= freq) {
-					if(IS_invert.top().second != freq) IS_invert.pop();
-					IS_invert.push(make_pair(comb, freq));
-					levelflag = true;
-				}
-			}
-		} while (prev_permutation(bitmask.begin(), bitmask.end()));
-
-		if(!levelflag) break;
+	const size_t candset_queue_size = 2 * this->k;
+	priority_queue<Set_Freq_pair, vector<Set_Freq_pair>, Comparator> candset_queue;
+	// candidate set of specific length
+	vector<Set_Freq_pair> candset_spec_len;
+	for(size_t i = 0; i < this->topk_item_freq.size(); i ++) {
+		vector<string> candset_len_one = {this->topk_item_freq[i].first};
+		double freq = this->topk_item_freq[i].second * -1;
+		candset_spec_len.push_back(make_pair(candset_len_one, freq));
 	}
 
-	// select the most frequent top 2*k
-	while(!IS_invert.empty()) {
-		auto &top(IS_invert.top());
+	size_t candset_size(1);
+	while(true) {
+		if(candset_spec_len.size() == 0) break;
+		for(size_t i = 0; i < candset_spec_len.size(); i ++) {
+			for(size_t j = 0; j < this->topk_item_freq.size(); j ++) {
+				vector<string> candset(candset_spec_len[i].first);
+				double freq = candset_spec_len[i].second;
+
+				if(find(candset.begin(), candset.end(), this->topk_item_freq[j].first) != candset.end()) continue;
+
+				candset.push_back(this->topk_item_freq[j].first);
+				freq *= (0.9 * this->topk_item_freq[j].second) / maxfreq;
+				if(candset_queue.size() < candset_queue_size) {
+					candset_queue.push(make_pair(candset, freq));
+				}
+				else if(candset_queue.top().second > freq) {
+					candset_queue.pop();
+					candset_queue.push(make_pair(candset, freq));
+				}
+			}
+		}
+
+		candset_spec_len.clear();
+		candset_size ++;
+		auto candset_queue_copy(candset_queue);
+		for(size_t i = 0; i < candset_queue.size(); i ++) {
+			if(candset_queue_copy.top().first.size() == candset_size) candset_spec_len.push_back(candset_queue_copy.top());
+			candset_queue.pop();
+		}
+	}
+
+	while(!candset_queue.empty()) {
+		auto &top(candset_queue.top());
 		this->IS.push_back(make_pair(top.first, top.second * -1));
-		IS_invert.pop();
+		candset_queue.pop();
 	}
 
 	reverse(this->IS.begin(), this->IS.end());
-	if(this->IS.size() > 2 * this->k)
-		this->IS.erase(this->IS.begin() + 2 * this->k, this->IS.end());
+	clog << "ConstructCandidateItemSet" << endl;
 }
