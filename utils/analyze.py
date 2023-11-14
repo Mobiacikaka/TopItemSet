@@ -81,7 +81,6 @@ def analyze():
 if __name__ == '__main__':
 	dataset = input('Dataset: ')
 	os.chdir(f'./datasets/{dataset}')
-	var = input('eps or k: ') or 'eps'
 	print(os.getcwd())
 	result_folder_name = ''
 	eps_list = []
@@ -90,23 +89,7 @@ if __name__ == '__main__':
 	kbar_list = []
 	run_times = 10
 
-	def set_global_to_var_eps():
-		global result_folder_name, eps_list, k_list
-		result_folder_name = 'result_eps'
-		eps_list = [5 * (i+1) / 10 for i in range(8)]
-		k_list = [32]
-
-	def set_global_to_var_k():
-		global result_folder_name, eps_list, k_list
-		result_folder_name = 'result_k'
-		eps_list = [4.0]
-		k_list = [8, 16, 32, 48, 64, 80, 96, 112, 128]
-
-	if var == 'eps':
-		set_global_to_var_eps()
-	else:
-		set_global_to_var_k()
 	result_folder_name = 'result_total'
-	eps_list = [0.5, 1.0, 2.0]
+	eps_list = [0.5, 1.0, 2.0, 4.0]
 	k_list = [16, 32, 64]
 	analyze()

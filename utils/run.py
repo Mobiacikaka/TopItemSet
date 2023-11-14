@@ -81,12 +81,11 @@ def onerun(eps, k, kbar, mu, times, port, results_folder_name):
 	port_list.remove(port)
 
 def main_multi():
-	dataset		= 'POS'
-	eps_list	= [0.5, 1.0, 2.0]
+	dataset		= 'IBM'
 	# eps_list	= [5 * i / 10 for i in range(1, 9)]
-	eps_list	= [0.5]
-	k_list		= [32]
 	# k_list		= [8, 16, 32, 48, 64, 80, 96, 112, 128]
+	eps_list = [0.5, 1.0, 2.0, 4.0]
+	k_list = [16, 32, 64]
 	mu_list		= [0.9]
 	kbar_list	= k_list
 	run_times	= 10
