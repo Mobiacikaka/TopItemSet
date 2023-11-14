@@ -1060,7 +1060,6 @@ void Party::MakeTopKPublic()
 
 void Party::ConstructCandidateItemSet()
 {
-	clog << "ConstructCandidateItemSet" << endl;
 	size_t maxfreq = 0;
 	for(size_t i = 0; i < this->topk_item_freq.size(); i++)
 		if(this->topk_item_freq[i].second > maxfreq)
@@ -1078,7 +1077,8 @@ void Party::ConstructCandidateItemSet()
 	vector<Set_Freq_pair> candset_spec_len;
 	for(size_t i = 0; i < this->topk_item_freq.size(); i ++) {
 		vector<string> candset_len_one = {this->topk_item_freq[i].first};
-		double freq = this->topk_item_freq[i].second * -1;
+		double freq(-1);
+		freq *= (0.9 * this->topk_item_freq[i].second) / maxfreq;
 		candset_spec_len.push_back(make_pair(candset_len_one, freq));
 	}
 
@@ -1086,7 +1086,13 @@ void Party::ConstructCandidateItemSet()
 	while(true) {
 		if(candset_spec_len.size() == 0) break;
 		for(size_t i = 0; i < candset_spec_len.size(); i ++) {
+			size_t begin_search_pos(0);
 			for(size_t j = 0; j < this->topk_item_freq.size(); j ++) {
+				vector<string> candset(candset_spec_len[i].first);
+				if(find(candset.begin(), candset.end(), this->topk_item_freq[j].first) != candset.end())
+					begin_search_pos = j + 1;
+			}
+			for(size_t j = begin_search_pos; j < this->topk_item_freq.size(); j ++) {
 				vector<string> candset(candset_spec_len[i].first);
 				double freq = candset_spec_len[i].second;
 
@@ -1109,16 +1115,17 @@ void Party::ConstructCandidateItemSet()
 		auto candset_queue_copy(candset_queue);
 		for(size_t i = 0; i < candset_queue.size(); i ++) {
 			if(candset_queue_copy.top().first.size() == candset_size) candset_spec_len.push_back(candset_queue_copy.top());
-			candset_queue.pop();
+			candset_queue_copy.pop();
 		}
 	}
 
 	while(!candset_queue.empty()) {
 		auto &top(candset_queue.top());
-		this->IS.push_back(make_pair(top.first, top.second * -1));
+		vector<string> candset(top.first);
+		sort(candset.begin(), candset.end());
+		this->IS.push_back(make_pair(candset, top.second * -1));
 		candset_queue.pop();
 	}
 
 	reverse(this->IS.begin(), this->IS.end());
-	clog << "ConstructCandidateItemSet" << endl;
 }
