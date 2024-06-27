@@ -40,6 +40,7 @@ void Party::set_param(
 	size_t kbar,
 	double eps,
 	double p1,
+	double p2,
 	double eps_em,
 	double mu
 )
@@ -56,9 +57,9 @@ void Party::set_param(
 	this->kbar = kbar >= k ? kbar : k;
 	// WARNING
 	// the input eps is a sum for item and itemset mining
-	// two operations share a same amount of privacy consumption
-	this->eps = eps / 2;
+	this->eps_total = eps;
 	this->p1 = p1;
+	this->p2 = p2;
 	this->eps_em = eps_em;
 	this->mu = mu;
 
@@ -183,8 +184,22 @@ void Party::Run()
 		exit(-1);
 	}
 
+	ofstream runtime("Runtime.out");
+	clock_t start_time = clock();
+
+	this->eps = this->eps_total * p2;
 	this->CalculateTopKItem(original_dataset);
+
+	runtime << "CalculateTopKItem" << endl;
+	runtime << (double)(clock() - start_time) / CLOCKS_PER_SEC << endl;
+	start_time = clock();
+
+	this->eps = this->eps_total * (1 - p2);
 	this->CalculateTopKItemSet_FrequencyEstimate(original_dataset);
+
+	runtime << "CalculateTopKItemSet_FrequencyEstimate" << endl;
+	runtime << (double)(clock() - start_time) / CLOCKS_PER_SEC << endl;
+	runtime.close();
 
 	this->tsocket->Close();
 }
@@ -546,22 +561,27 @@ bool Party::compare(KVpair & kv1, KVpair & kv2, int)
 
 	share *srv1, *srv2, *cli1, *cli2;
 	if(role == SERVER) {
-		srv1 = circ->PutINGate(static_cast<uint32_t>(kv1.second), bitlen, role);
-		srv2 = circ->PutINGate(static_cast<uint32_t>(kv2.second), bitlen, role);
+		// srv1 = circ->PutINGate(static_cast<uint32_t>(kv1.second), bitlen, role);
+		// srv2 = circ->PutINGate(static_cast<uint32_t>(kv2.second), bitlen, role);
+		// cli1 = circ->PutDummyINGate(bitlen);
+		// cli2 = circ->PutDummyINGate(bitlen);
+		srv1 = circ->PutINGate(static_cast<uint32_t>(kv1.second - kv2.second), bitlen, role);
 		cli1 = circ->PutDummyINGate(bitlen);
-		cli2 = circ->PutDummyINGate(bitlen);
 	}
 	else {
+		// srv1 = circ->PutDummyINGate(bitlen);
+		// srv2 = circ->PutDummyINGate(bitlen);
+		// cli1 = circ->PutINGate(static_cast<uint32_t>(kv1.second), bitlen, role);
+		// cli2 = circ->PutINGate(static_cast<uint32_t>(kv2.second), bitlen, role);
 		srv1 = circ->PutDummyINGate(bitlen);
-		srv2 = circ->PutDummyINGate(bitlen);
-		cli1 = circ->PutINGate(static_cast<uint32_t>(kv1.second), bitlen, role);
-		cli2 = circ->PutINGate(static_cast<uint32_t>(kv2.second), bitlen, role);
+		cli1 = circ->PutINGate(static_cast<uint32_t>(kv1.second - kv2.second), bitlen, role);
 	}
 
 	share *cmb1, *cmb2, *shr_cmp, *shr_out;
-	cmb1 = circ->PutSUBGate(srv1, cli1);
-	cmb2 = circ->PutSUBGate(srv2, cli2);
-	shr_cmp = circ->PutGTGate(cmb1, cmb2);
+	/* cmb1 = circ->PutSUBGate(srv1, cli1); */
+	/* cmb2 = circ->PutSUBGate(srv2, cli2); */
+	/* shr_cmp = circ->PutGTGate(cmb1, cmb2); */
+	shr_cmp = circ->PutGTGate(srv1, cli1);
 	shr_out = circ->PutOUTGate(shr_cmp, ALL);
 
 	party->ExecCircuit();
@@ -570,8 +590,10 @@ bool Party::compare(KVpair & kv1, KVpair & kv2, int)
 	assert(output == 0 || output == 1);
 
 	delete party;
-	delete srv1, srv2, cli1, cli2;
-	delete cmb1, cmb2, shr_cmp, shr_out;
+	/* delete srv1, srv2, cli1, cli2; */
+	delete srv1, cli1;
+	/* delete cmb1, cmb2, shr_cmp, shr_out; */
+	delete shr_cmp, shr_out;
 
 	return output;
 }
@@ -979,8 +1001,8 @@ void Party::Selection()
 	double delta_q;
 	double T; // threshold
 
-	eps1 = p1 * eps;
-	eps2 = eps - eps1;
+	eps1 = p1 * this->eps;
+	eps2 = this->eps - eps1;
 	c = 2 * eps1 / eps2 ;
 	delta_q = get_delta_q(delta, kbar, c);
 	T = get_T(delta_q, eps1, eps2);

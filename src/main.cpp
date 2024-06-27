@@ -21,6 +21,7 @@ int32_t ReadTestOptions(
 	size_t*			kbar,
 	double*			eps,
 	double*			p1,
+	double*			p2,
 	double*			eps_em,
 	double*			mu
 ) 
@@ -39,7 +40,8 @@ int32_t ReadTestOptions(
 		{ (void*) k,	 		T_NUM, "k", "k",	false, false },
 		{ (void*) kbar, 		T_NUM, "1", "kbar",	false, false },
 		{ (void*) eps,	 		T_DOUBLE, "2", "epsilon",	false, false },
-		{ (void*) p1,	 		T_DOUBLE, "3", "p1 and p2",	false, false },
+		{ (void*) p1,	 		T_DOUBLE, "3", "p1",	false, false },
+		{ (void*) p2,	 		T_DOUBLE, "5", "p2",	false, false },
 		{ (void*) eps_em, 		T_DOUBLE, "4", "eps EM",	false, false },
 		{ (void*) mu,	 		T_DOUBLE, "m", "mu",		false, false },
 	};
@@ -74,10 +76,11 @@ int main(int argc, char** argv) {
 	size_t kbar(0);
 	double eps(1.0);
 	double p1(0.37);
+	double p2(0.5);
 	double eps_em(0);
 	double mu(0.9);
 
-    ReadTestOptions(&argc, &argv, &role, &bitlen, &nvals, &secparam, &address, &port, &test_op, &k, &kbar, &eps, &p1, &eps_em, &mu);
+    ReadTestOptions(&argc, &argv, &role, &bitlen, &nvals, &secparam, &address, &port, &test_op, &k, &kbar, &eps, &p1, &p2, &eps_em, &mu);
 
     seclvl seclevel = get_sec_lvl(secparam);
 
@@ -85,7 +88,7 @@ int main(int argc, char** argv) {
 
 	srand(time(NULL));
 
-	party->set_param(role, address, port, seclevel, bitlen, nthreads, mt_alg, k, kbar, eps, p1, eps_em, mu);
+	party->set_param(role, address, port, seclevel, bitlen, nthreads, mt_alg, k, kbar, eps, p1, p2, eps_em, mu);
 	party->Run();
 
 	delete party;

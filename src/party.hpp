@@ -41,7 +41,9 @@ private:
 	size_t k;
 	size_t kbar;
 	double eps;
+	double eps_total;
 	double p1;
+	double p2;
 	double eps_em;
 	double delta;
 
@@ -107,7 +109,7 @@ public:
 	void set_param(e_role role, std::string address,
 		uint16_t port, seclvl seclevel, uint32_t bitlen,
 		uint32_t nthreads, e_mt_gen_alg mt_alg,
-		size_t k, size_t kbar, double eps, double p1,
+		size_t k, size_t kbar, double eps, double p1, double p2,
 		double eps_em, double mu);
 	void Run();
 
